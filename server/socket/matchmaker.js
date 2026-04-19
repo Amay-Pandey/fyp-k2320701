@@ -1,8 +1,7 @@
 const glicko2 = require('glicko2');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-
-const Session = require('../models/session'); // Your new Session model
+const Session = require('../models/sessions'); // Your new Session model
 
 module.exports = (io) => {
     const runMatchmaking = async (sessionId) => {
