@@ -3,6 +3,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const glicko2 = require('glicko2');
+require('dotenv').config();
+const { MongoClient } = require('mongodb');
 
 const app = express();
 app.use(cors());
@@ -14,6 +16,21 @@ const io = new Server(server, {
 
 const settings = { tau: 0.5, rating: 1500, rd: 350, vol: 0.06 };
 const ranking = new glicko2.Glicko2(settings);
+
+const client = new MongoClient(process.env.MONGO_DB_URI);
+let db;
+
+async function connectDB() {
+    try {
+        await client.connect();
+        db = client.db('fyp2026'); // Database name from URI
+        console.log('Connected to MongoDB');
+    } catch (error) {
+        console.error('Error connecting to MongoDB:', error);
+    }
+}
+
+connectDB();
 
 let activeMatches = {}; 
 let waitingQueue = [];
@@ -116,4 +133,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3001, () => console.log('Server running on port 3001'));
+server.listen(3002, () => console.log('Server running on port 3002'));
