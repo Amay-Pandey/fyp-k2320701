@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const sessionSchema = new mongoose.Schema({
     title: String,
     adminId: mongoose.Schema.Types.ObjectId, // The person whose device is being used
