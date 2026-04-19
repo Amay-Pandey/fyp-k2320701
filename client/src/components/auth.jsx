@@ -38,16 +38,34 @@ const Auth = ({ onLoginSuccess }) => {
             <h2>{isLogin ? 'Login' : 'Register'}</h2>
             {error && <p style={{ color: 'red' }}>{error}</p>}
             <form onSubmit={handleSubmit}>
-                <input 
+                <input
                     type="text" placeholder="Username" required
-                    onChange={(e) => setFormData({...formData, username: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                     style={{ display: 'block', width: '100%', marginBottom: '10px' }}
                 />
-                <input 
+                <input
                     type="password" placeholder="Password" required
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     style={{ display: 'block', width: '100%', marginBottom: '10px' }}
                 />
+                // Inside your Auth.jsx form
+                {!isLogin && (
+                    <>
+                        <input
+                            type="number" placeholder="Age"
+                            onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                        />
+                        <select onChange={(e) => setFormData({ ...formData, level: e.target.value })}>
+                            <option value="Beginner">Beginner</option>
+                            <option value="Weekly casual">Weekly casual</option>
+                            <option value="Tier 1/2/3 BE">Tier 1/2/3 BE</option>
+                            <option value="Bi-weekly casual">Bi-weekly casual</option>
+                            <option value="Occasional tournament player">Occasional tournament player</option>
+                            <option value="ISO medal holder">ISO medal holder</option>
+                            <option value="Badminton England rated">Badminton England rated</option>
+                        </select>
+                    </>
+                )}
                 <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#2196F3', color: 'white', border: 'none' }}>
                     {isLogin ? 'Login' : 'Sign Up'}
                 </button>

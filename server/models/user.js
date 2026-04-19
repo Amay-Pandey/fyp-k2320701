@@ -1,11 +1,23 @@
 const mongoose = require('mongoose');
+
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     age: Number,
-    level: { 
-        type: String, 
-        enum: ['Beginner', 'Weekly casual', 'Bi-weekly casual', 'Occasional tournament player', 'ISO medal holder', 'Badminton England rated', 'Tier 1/2/3 BE'] 
-    },
-    elo: { type: Number, default: 1200 }
+    level: String,
+    // Glicko-2 specific fields
+    rating: { type: Number, default: 1500 },
+    rd: { type: Number, default: 350 },
+    vol: { type: Number, default: 0.06 },
+    // Match History for the Dashboard
+    matchHistory: [{
+        opponent: String,
+        teammate: String, // Useful for doubles
+        isWin: Boolean,
+        eloBefore: Number,
+        eloAfter: Number,
+        matchDate: { type: Date, default: Date.now }
+    }]
 });
+
+module.exports = mongoose.model('User', userSchema);
