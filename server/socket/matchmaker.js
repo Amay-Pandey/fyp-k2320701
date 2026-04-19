@@ -2,78 +2,56 @@ const glicko2 = require('glicko2');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 
-const ranking = new glicko2.Glicko2({ tau: 0.5, rating: 1500, rd: 350, vol: 0.06 });
-let waitingQueue = [];
+const Session = require('../models/session'); // Your new Session model
 
 module.exports = (io) => {
-    const findMatches = () => {
-        if (waitingQueue.length < 2) return;
+    const runMatchmaking = async (sessionId) => {
+        // 1. Fetch the specific session from DB
+        const session = await Session.findById(sessionId);
+        if (!session || !session.isActive) return;
 
-        waitingQueue.sort((a, b) => a.joinedAt - b.joinedAt);
+        // 2. Identify busy players and courts
+        const busyPlayers = session.matches
+            .filter(m => m.status === 'ongoing')
+            .flatMap(m => [m.player1, m.player2]);
 
-        for (let i = 0; i < waitingQueue.length; i++) {
-            for (let j = i + 1; j < waitingQueue.length; j++) {
-                const p1 = waitingQueue[i];
-                const p2 = waitingQueue[j];
+        const busyCourts = session.matches
+            .filter(m => m.status === 'ongoing')
+            .map(m => m.court);
 
-                const diff = Math.abs(p1.rating - p2.rating);
-                const timeBonus = (Date.now() - p1.joinedAt) / 1000;
+        // 3. Find available players and courts
+        const availablePlayers = session.players.filter(p => !busyPlayers.includes(p.name));
+        const allCourts = Array.from({ length: session.numCourts }, (_, i) => i + 1);
+        const freeCourt = allCourts.find(c => !busyCourts.includes(c));
 
-                if (diff - timeBonus < 150) {
-                    const matchId = `match_${Date.now()}`;
-                    const court = Math.floor(Math.random() * 5) + 1;
+        // 4. Logic for Singles (2 players) or Doubles (4 players)
+        const playersNeeded = session.isDoubles ? 4 : 2;
 
-                    io.to(p1.socketId).emit('matchFound', { 
-                        opponentName: p2.username, 
-                        opponentId: p2.userId, 
-                        court, 
-                        matchId 
-                    });
-                    io.to(p2.socketId).emit('matchFound', { 
-                        opponentName: p1.username, 
-                        opponentId: p1.userId, 
-                        court, 
-                        matchId 
-                    });
+        if (availablePlayers.length >= playersNeeded && freeCourt) {
+            // Skill-based sort
+            availablePlayers.sort((a, b) => a.elo - b.elo);
+            
+            const matchData = {
+                player1: availablePlayers[0].name,
+                player2: availablePlayers[1].name,
+                court: freeCourt,
+                status: 'ongoing',
+                matchId: `match_${Date.now()}`
+            };
 
-                    waitingQueue = waitingQueue.filter(p => p.socketId !== p1.socketId && p.socketId !== p2.socketId);
-                    io.emit('queueUpdate', waitingQueue.length);
-                    return;
-                }
-            }
+            // 5. Save the match to the Session in DB (Persistence!)
+            session.matches.push(matchData);
+            await session.save();
+
+            // 6. Tell everyone in the session a match was found
+            io.emit(`sessionUpdate_${sessionId}`, session);
         }
     };
 
-    setInterval(findMatches, 5000);
-
+    // Trigger this whenever a match ends or a player joins
     io.on('connection', (socket) => {
-        socket.on('joinQueue', async ({ token }) => {
-            try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                const user = await User.findById(decoded.id);
-                
-                if (!user) return;
-
-                // Remove existing entry for this user if they re-joined
-                waitingQueue = waitingQueue.filter(p => p.userId !== user._id.toString());
-
-                waitingQueue.push({
-                    socketId: socket.id,
-                    userId: user._id.toString(),
-                    username: user.username,
-                    rating: user.rating,
-                    joinedAt: Date.now()
-                });
-
-                io.emit('queueUpdate', waitingQueue.length);
-            } catch (e) {
-                socket.emit('error', 'Authentication failed');
-            }
-        });
-
-        socket.on('disconnect', () => {
-            waitingQueue = waitingQueue.filter(p => p.socketId !== socket.id);
-            io.emit('queueUpdate', waitingQueue.length);
+        socket.on('manualTriggerMatch', ({ sessionId }) => {
+            runMatchmaking(sessionId);
         });
     });
 };
