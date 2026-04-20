@@ -12,6 +12,8 @@ const Dashboard = () => {
     const [matchTimer, setMatchTimer] = useState(0);
     const [selectedWinner, setSelectedWinner] = useState({});
     const [matchScores, setMatchScores] = useState({});
+    const [newPlayerName, setNewPlayerName] = useState('');
+    const [replacementSelection, setReplacementSelection] = useState({});
     const [endingMatchId, setEndingMatchId] = useState(null);
     const [matchActionError, setMatchActionError] = useState('');
 
@@ -208,6 +210,83 @@ const Dashboard = () => {
         }
     };
 
+    const handleAddPlayer = async () => {
+        if (!newPlayerName.trim()) {
+            setMatchActionError('Enter a name to add a player.');
+            return;
+        }
+
+        setMatchActionError('');
+        try {
+            const res = await fetch(`${API_URL}/api/session/player/add`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ sessionId: activeSession._id, username: newPlayerName.trim() })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to add player');
+            setActiveSession(data.session);
+            setNewPlayerName('');
+        } catch (err) {
+            setMatchActionError(err.message);
+        }
+    };
+
+    const handleRemoveQueuePlayer = async (username) => {
+        setMatchActionError('');
+        try {
+            const res = await fetch(`${API_URL}/api/session/player/remove`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ sessionId: activeSession._id, username })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to remove player');
+            setActiveSession(data.session);
+        } catch (err) {
+            setMatchActionError(err.message);
+        }
+    };
+
+    const handleReplacePlayer = async (match, field) => {
+        const key = `${match.matchId}-${field}`;
+        const replacementUsername = replacementSelection[key];
+
+        if (!replacementUsername) {
+            setMatchActionError('Select a replacement from the queue first.');
+            return;
+        }
+
+        setMatchActionError('');
+        try {
+            const res = await fetch(`${API_URL}/api/session/player/replace`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    sessionId: activeSession._id,
+                    matchId: match.matchId,
+                    field,
+                    replacementUsername
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to replace player');
+            setActiveSession(data.session);
+            setReplacementSelection((prev) => ({ ...prev, [key]: '' }));
+        } catch (err) {
+            setMatchActionError(err.message);
+        }
+    };
+
     const handleScoreChange = (matchId, field, value) => {
         setMatchScores((prev) => ({
             ...prev,
@@ -385,7 +464,10 @@ const Dashboard = () => {
                             {sessionToShow.matches.map((match, idx) => (
                                 <div key={idx} style={{ background: '#252525', padding: '18px', borderRadius: '10px', marginBottom: '12px' }}>
                                     <p style={{ fontWeight: '700' }}>Court {match.court}</p>
-                                    <p>{match.player1} & {match.player2} {match.player3 ? `vs ${match.player3} & ${match.player4}` : ''}</p>
+                                    <p>
+                                        <strong>{match.player1 || 'Vacant'}</strong> & <strong>{match.player2 || 'Vacant'}</strong>
+                                        {match.player3 || match.player4 ? ` vs ${match.player3 || 'Vacant'} & ${match.player4 || 'Vacant'}` : ''}
+                                    </p>
                                     <p>Status: {match.status.toUpperCase()}</p>
                                     {match.status === 'finished' && (
                                         <p>Winner: {match.winner}</p>
@@ -416,29 +498,55 @@ const Dashboard = () => {
                         <div style={{ fontSize: '1.1rem', marginBottom: '20px' }}>
                             <p>Live timer: <strong>{formatTimer(matchTimer)}</strong></p>
                         </div>
-                        {waitingQueue.length > 0 && (
-                            <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '16px', margin: '0 auto 20px', maxWidth: '700px' }}>
-                                <h4 style={{ margin: '0 0 10px', color: '#bbb' }}>Waiting Queue</h4>
-                                {waitingQueue.map((player) => (
-                                    <div key={player.username} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #222' }}>
-                                        <span>{player.username}</span>
-                                        <span style={{ color: '#888' }}>Waiting {queueWaitTime(player.joinedAt)}</span>
-                                    </div>
-                                ))}
+                        <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '16px', margin: '0 auto 20px', maxWidth: '700px' }}>
+                            <h4 style={{ margin: '0 0 10px', color: '#bbb' }}>Add Player to Queue</h4>
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Player name"
+                                    value={newPlayerName}
+                                    onChange={(e) => setNewPlayerName(e.target.value)}
+                                    style={{ flex: 1, minWidth: '180px', padding: '10px', borderRadius: '8px', border: '1px solid #444', background: '#121212', color: '#fff' }}
+                                />
+                                <button className="btn-primary" onClick={handleAddPlayer}>
+                                    Add Player
+                                </button>
                             </div>
-                        )}
+                        </div>
+                        <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '16px', margin: '0 auto 20px', maxWidth: '700px' }}>
+                            <h4 style={{ margin: '0 0 10px', color: '#bbb' }}>Waiting Queue</h4>
+                            {waitingQueue.length > 0 ? (
+                                waitingQueue.map((player) => (
+                                    <div key={player.username} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #222' }}>
+                                        <div>
+                                            <div>{player.username}</div>
+                                            <div style={{ color: '#888', fontSize: '0.85rem' }}>Waiting {queueWaitTime(player.joinedAt)}</div>
+                                        </div>
+                                        <button
+                                            className="btn-primary"
+                                            style={{ background: '#c62828', borderColor: '#a82424' }}
+                                            onClick={() => handleRemoveQueuePlayer(player.username)}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))
+                            ) : (
+                                <p style={{ color: '#666' }}>No waiting players at the moment.</p>
+                            )}
+                        </div>
                         {activeSession.matches?.filter(m => m.status === 'ongoing').length > 0 ? (
                             activeSession.matches.filter(m => m.status === 'ongoing').map((match, idx) => (
                                 <div key={idx} style={{ background: '#252525', padding: '20px', borderRadius: '10px', marginBottom: '20px', textAlign: 'left' }}>
                                     <p><strong>Court {match.court}</strong></p>
                                     <p style={{ margin: '6px 0' }}>
-                                        <strong>{match.player1}</strong> <span style={{ color: '#666' }}>vs</span> <strong>{match.player2}</strong>
+                                        <strong>{match.player1 || 'Vacant'}</strong> <span style={{ color: '#666' }}>vs</span> <strong>{match.player2 || 'Vacant'}</strong>
                                     </p>
-                                    {match.player3 && match.player4 && (
+                                    {match.player3 || match.player4 ? (
                                         <p style={{ margin: '6px 0' }}>
-                                            <strong>{match.player3}</strong> <span style={{ color: '#666' }}>vs</span> <strong>{match.player4}</strong>
+                                            <strong>{match.player3 || 'Vacant'}</strong> <span style={{ color: '#666' }}>vs</span> <strong>{match.player4 || 'Vacant'}</strong>
                                         </p>
-                                    )}
+                                    ) : null}
 
                                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
                                         {match.player3 && match.player4 ? (
@@ -487,6 +595,49 @@ const Dashboard = () => {
                                                     {match.player2} wins
                                                 </label>
                                             </>
+                                        )}
+                                    </div>
+
+                                    <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
+                                        {waitingQueue.length > 0 && (
+                                            <div style={{ display: 'grid', gap: '8px' }}>
+                                                <label style={{ color: '#aaa' }}>Replace a player from this match</label>
+                                                {(activeSession.isDoubles ? ['player1', 'player2', 'player3', 'player4'] : ['player1', 'player2']).map((field) => {
+                                                    const currentName = match[field] || 'Vacant spot';
+                                                    const key = `${match.matchId}-${field}`;
+                                                    return (
+                                                        <div key={key} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                            <span style={{ color: '#ddd', minWidth: '90px' }}>{currentName}</span>
+                                                            <select
+                                                                value={replacementSelection[key] || ''}
+                                                                onChange={(e) => setReplacementSelection({ ...replacementSelection, [key]: e.target.value })}
+                                                                style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
+                                                            >
+                                                                <option value="">Choose replacement</option>
+                                                                {waitingQueue.map((player) => (
+                                                                    <option key={player.username} value={player.username}>{player.username}</option>
+                                                                ))}
+                                                            </select>
+                                                            <button
+                                                                className="btn-primary"
+                                                                style={{ padding: '10px 16px' }}
+                                                                onClick={() => handleReplacePlayer(match, field)}
+                                                            >
+                                                                Replace
+                                                            </button>
+                                                            {match[field] && (
+                                                                <button
+                                                                    className="btn-primary"
+                                                                    style={{ padding: '10px 16px', background: '#c62828', borderColor: '#a82424' }}
+                                                                    onClick={() => handleRemoveQueuePlayer(match[field])}
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         )}
                                     </div>
 

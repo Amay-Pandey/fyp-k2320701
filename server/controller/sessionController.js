@@ -72,6 +72,25 @@ const buildMatches = (players, numCourts, isDoubles) => {
 
 const findSessionPlayer = (session, username) => session.players.find((player) => player.username === username);
 
+const createPlayerObject = async (name) => {
+    const user = await User.findOne({ username: name });
+    return {
+        username: name,
+        isGuest: !user,
+        rating: user ? user.rating : 1500,
+        rd: user ? user.rd : 350,
+        vol: user ? user.vol : 0.06,
+        joinedAt: new Date()
+    };
+};
+
+const getQueuePlayers = (session) => {
+    const ongoing = getOngoingPlayers(session);
+    return session.players.filter((player) => !ongoing.includes(player.username));
+};
+
+const findMatchField = (match, username) => ['player1', 'player2', 'player3', 'player4'].find((field) => match[field] === username);
+
 const getTeamStats = (players) => {
     const count = players.length;
     return {
@@ -324,6 +343,162 @@ export const endMatch = async (req, res) => {
         res.json({ message: 'Match ended', session });
     } catch (err) {
         console.error('END MATCH ERROR:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const addPlayerToSession = async (req, res) => {
+    try {
+        const { sessionId, username } = req.body;
+        if (!username) {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const session = await Session.findById(sessionId);
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        if (session.adminId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        if (session.players.some((player) => player.username === username)) {
+            return res.status(400).json({ error: 'Player already in session' });
+        }
+
+        const newPlayer = await createPlayerObject(username);
+        session.players.push(newPlayer);
+
+        const waitingPlayers = getQueuePlayers(session);
+        const freeCourts = getFreeCourts(session);
+        const newMatches = buildWaitingMatches(waitingPlayers, freeCourts, session.isDoubles);
+        if (newMatches.length > 0) {
+            session.matches.push(...newMatches);
+        }
+
+        const hasOngoing = session.matches.some((m) => m.status === 'ongoing');
+        session.isActive = hasOngoing || waitingPlayers.length > 0;
+
+        await session.save();
+        res.json({ message: 'Player added', session });
+    } catch (err) {
+        console.error('ADD PLAYER ERROR:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const removePlayerFromSession = async (req, res) => {
+    try {
+        const { sessionId, username } = req.body;
+        if (!username) {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const session = await Session.findById(sessionId);
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        if (session.adminId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        if (!session.players.some((player) => player.username === username)) {
+            return res.status(404).json({ error: 'Player not found in session' });
+        }
+
+        session.matches.forEach((match) => {
+            ['player1', 'player2', 'player3', 'player4'].forEach((field) => {
+                if (match[field] === username) {
+                    match[field] = undefined;
+                }
+            });
+        });
+
+        session.players = session.players.filter((player) => player.username !== username);
+
+        const waitingPlayers = getQueuePlayers(session);
+        const freeCourts = getFreeCourts(session);
+        const newMatches = buildWaitingMatches(waitingPlayers, freeCourts, session.isDoubles);
+        if (newMatches.length > 0) {
+            session.matches.push(...newMatches);
+        }
+
+        const hasOngoing = session.matches.some((m) => m.status === 'ongoing');
+        session.isActive = hasOngoing || waitingPlayers.length > 0;
+
+        await session.save();
+        res.json({ message: 'Player removed', session });
+    } catch (err) {
+        console.error('REMOVE PLAYER ERROR:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const replaceMatchPlayer = async (req, res) => {
+    try {
+        const { sessionId, matchId, field, replacementUsername } = req.body;
+        if (!field || !replacementUsername) {
+            return res.status(400).json({ error: 'Both field and replacementUsername are required' });
+        }
+
+        const allowedFields = ['player1', 'player2', 'player3', 'player4'];
+        if (!allowedFields.includes(field)) {
+            return res.status(400).json({ error: 'Invalid match field' });
+        }
+
+        const session = await Session.findById(sessionId);
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        if (session.adminId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        const match = session.matches.find((m) => m.matchId === matchId);
+        if (!match) {
+            return res.status(404).json({ error: 'Match not found' });
+        }
+
+        const queuePlayers = getQueuePlayers(session).map((player) => player.username);
+        const existingPlayer = session.players.some((player) => player.username === replacementUsername);
+        const currentPlayer = match[field];
+
+        if (replacementUsername === currentPlayer) {
+            return res.status(400).json({ error: 'Replacement must be a different player' });
+        }
+
+        if (!queuePlayers.includes(replacementUsername) && existingPlayer) {
+            return res.status(400).json({ error: 'Replacement player must be waiting in the queue or be a new name' });
+        }
+
+        if (!queuePlayers.includes(replacementUsername) && !existingPlayer) {
+            const newPlayer = await createPlayerObject(replacementUsername);
+            session.players.push(newPlayer);
+        }
+
+        match[field] = replacementUsername;
+
+        if (currentPlayer) {
+            session.players = session.players.filter((player) => player.username !== currentPlayer);
+        }
+
+        const waitingPlayers = getQueuePlayers(session);
+        const freeCourts = getFreeCourts(session);
+        const newMatches = buildWaitingMatches(waitingPlayers, freeCourts, session.isDoubles);
+        if (newMatches.length > 0) {
+            session.matches.push(...newMatches);
+        }
+
+        const hasOngoing = session.matches.some((m) => m.status === 'ongoing');
+        session.isActive = hasOngoing || waitingPlayers.length > 0;
+
+        await session.save();
+        res.json({ message: 'Player replaced', session });
+    } catch (err) {
+        console.error('REPLACE PLAYER ERROR:', err);
         res.status(500).json({ error: err.message });
     }
 };
