@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import Auth from './components/auth';
-import Matchmaker from './components/matchmaker';
 
 function App() {
   const token = localStorage.getItem('token');
