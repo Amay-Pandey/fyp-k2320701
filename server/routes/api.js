@@ -1,23 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/user'); // Ensure this matches your file name exactly
-const authMiddleware = require('../middleware/autho'); // Using your 'autho.js' file
+const User = require('../models/user');
+const authMiddleware = require('../middleware/autho'); // matches your filename
 
-// This endpoint allows the Dashboard to fetch the user's ELO and match history
+// GET /api/users/me
 router.get('/me', authMiddleware, async (req, res) => {
     try {
-        // req.user.id comes from the logic inside your autho.js middleware
         const user = await User.findById(req.user.id).select('-password');
-        
-        if (!user) {
-            return res.status(404).json({ msg: 'User not found' });
-        }
-        
         res.json(user);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        res.status(500).json({ error: "Server Error" });
     }
+});
+
+// POST /api/session/start
+router.post('/start', authMiddleware, async (req, res) => {
+   // your session start logic here
+   res.json({ message: "Session started" });
 });
 
 module.exports = router;

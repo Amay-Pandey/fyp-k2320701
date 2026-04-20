@@ -5,22 +5,37 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
+// 1. Correct Imports
 const authRoutes = require('./routes/auth');
+const apiRoutes = require('./routes/api'); // Make sure this line exists!
 const initMatchmaker = require('./socket/matchmaker');
 
 const app = express();
-app.use(cors());
+
+// 2. CORS Configuration
+// It is safer to allow your specific frontend URL
+app.use(cors({
+    origin: "https://courtsync-ebsd.onrender.com",
+    credentials: true
+}));
 app.use(express.json());
 
-// Routes
+// 3. Registered Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', apiRoutes);   // Matches frontend call to /api/users/me
+app.use('/api/session', apiRoutes); // Matches frontend call to /api/session/start
 
 const server = http.createServer(app);
+
+// 4. Socket.io Configuration
 const io = new Server(server, {
-    cors: { origin: "https://courtsync-ebsd.onrender.com", methods: ["GET", "POST"] } 
+    cors: { 
+        origin: "https://courtsync-ebsd.onrender.com", 
+        methods: ["GET", "POST"] 
+    } 
 });
 
-// Database
+// 5. Database Connection
 mongoose.connect(process.env.MONGO_DB_URI)
     .then(() => console.log('MongoDB Connected'))
     .catch(err => console.error('DB Error:', err));
@@ -28,5 +43,7 @@ mongoose.connect(process.env.MONGO_DB_URI)
 // Socket Logic
 initMatchmaker(io);
 
-const PORT = 3002;
-server.listen(PORT, () => console.log(`Server on port ${PORT}`));
+// 6. Dynamic Port for Render
+// Render sets an environment variable for the port. 3002 will be the fallback for local dev.
+const PORT = process.env.PORT || 3002;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
