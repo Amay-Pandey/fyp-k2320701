@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
-const authMiddleware = require('../middleware/autho'); // matches your filename
+import authMiddleware from '../middleware/autho.js';
 
 // GET /api/users/me
 router.get('/me', authMiddleware, async (req, res) => {
