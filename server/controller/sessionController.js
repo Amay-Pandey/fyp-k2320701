@@ -297,6 +297,13 @@ export const endMatch = async (req, res) => {
             match.score = { ...match.score, ...score };
         }
 
+        const finishedPlayers = [match.player1, match.player2, match.player3, match.player4].filter(Boolean);
+        session.players.forEach((player) => {
+            if (finishedPlayers.includes(player.username)) {
+                player.joinedAt = new Date();
+            }
+        });
+
         const waitingPlayers = session.players.filter((p) => {
             const ongoing = getOngoingPlayers(session);
             return !ongoing.includes(p.username);
