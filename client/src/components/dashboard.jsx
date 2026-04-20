@@ -8,6 +8,9 @@ const Dashboard = () => {
     const [leaderboardRows, setLeaderboardRows] = useState([]);
     const [leaderboardLoading, setLeaderboardLoading] = useState(false);
     const [leaderboardError, setLeaderboardError] = useState('');
+    const [dyslexiaMode, setDyslexiaMode] = useState(false);
+    const [fontSizePercent, setFontSizePercent] = useState(110);
+    const dashboardClass = dyslexiaMode ? 'dashboard-container dyslexia-mode' : 'dashboard-container';
     const [activeSession, setActiveSession] = useState(null);
     const [selectedSession, setSelectedSession] = useState(null);
     const [sessionHistory, setSessionHistory] = useState([]);
@@ -91,7 +94,17 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchData();
+
+        const savedDyslexia = localStorage.getItem('dyslexiaMode');
+        const savedFontSize = localStorage.getItem('fontSizePercent');
+        if (savedDyslexia !== null) setDyslexiaMode(savedDyslexia === 'true');
+        if (savedFontSize) setFontSizePercent(Number(savedFontSize));
     }, []);
+
+    useEffect(() => {
+        localStorage.setItem('dyslexiaMode', dyslexiaMode.toString());
+        localStorage.setItem('fontSizePercent', fontSizePercent.toString());
+    }, [dyslexiaMode, fontSizePercent]);
 
     useEffect(() => {
         const ongoingMatch = activeSession?.matches?.find((m) => m.status === 'ongoing');
@@ -363,7 +376,7 @@ const Dashboard = () => {
     if (loading) return <div style={{ color: 'white', textAlign: 'center', marginTop: '50px' }}>Connecting to CourtSync...</div>;
 
     return (
-        <div className="dashboard-container">
+        <div className={dashboardClass} style={dyslexiaMode ? { fontSize: `${fontSizePercent}%` } : {}}>
             <style>
                 {`
                 .dashboard-container { background: #121212; color: #e0e0e0; min-height: 100vh; padding: 40px 20px; font-family: 'Inter', sans-serif; }
@@ -382,6 +395,14 @@ const Dashboard = () => {
                 .top-tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
                 .top-tabs button { background: #171a20; color: #b5b8c7; border: 1px solid transparent; border-radius: 999px; padding: 12px 20px; transition: all 0.2s ease; }
                 .top-tabs button.active { background: #2f7be5; color: #fff; border-color: rgba(75,154,255,0.35); }
+                .dyslexia-mode { background: #090b10; color: #f8f8f8; }
+                .dyslexia-mode .dash-card { background: #10151f; border-color: #3d6ff0; }
+                .dyslexia-mode .topbar { background: linear-gradient(135deg, #2545a5, #1a6ad5); }
+                .dyslexia-mode .top-tabs button { background: rgba(255,255,255,0.08); color: #e9f0ff; border-color: rgba(255,255,255,0.18); }
+                .dyslexia-mode .top-tabs button.active { background: #3c7cff; color: #fff; border-color: rgba(255,255,255,0.6); }
+                .dyslexia-mode .dash-card, .dyslexia-mode .settings-card { border-color: #2c6bec; }
+                .dyslexia-mode .summary-card, .dyslexia-mode .profile-card, .dyslexia-mode .settings-card { background: #132032; }
+                .dyslexia-mode .settings-preview { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
                 .hero-card { display: flex; justify-content: space-between; align-items: center; gap: 20px; background: linear-gradient(135deg, #3e70d1, #22c1c3); padding: 26px 30px; border-radius: 22px; margin-bottom: 20px; box-shadow: 0 20px 55px rgba(0, 0, 0, 0.18); }
                 .hero-card h2 { margin: 0; font-size: 2rem; letter-spacing: 0.02em; }
                 .hero-card p { margin: 10px 0 0; color: rgba(255,255,255,0.92); }
@@ -392,6 +413,23 @@ const Dashboard = () => {
                 .summary-card { background: #161a22; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 24px; }
                 .summary-card span { display: block; color: #a9c6ff; font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
                 .summary-card strong { display: block; color: #fff; font-size: 2rem; }
+                .settings-card { background: #1f232d; border: 1px solid #333; border-radius: 20px; padding: 28px; margin: 0 auto 24px; max-width: 760px; }
+                .settings-card h4 { margin: 0 0 14px; color: #fff; font-size: 1.05rem; letter-spacing: 0.04em; }
+                .settings-card p { margin: 0; color: #c2d1ff; }
+                .settings-row { display: grid; gap: 18px; margin-top: 22px; }
+                .settings-option { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 20px; background: #11171f; border: 1px solid #2a3040; border-radius: 16px; }
+                .settings-option strong { color: #fff; }
+                .settings-label { color: #97aaff; font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; }
+                .settings-range { width: 100%; display: flex; align-items: center; gap: 16px; }
+                .settings-range input { flex: 1; accent-color: #4b86ff; }
+                .settings-value { color: #c7d6ff; min-width: 56px; text-align: right; font-weight: 700; }
+                .settings-preview { margin-top: 18px; border: 1px solid #2a3040; border-radius: 16px; padding: 18px 20px; color: #eef2ff; }
+                .settings-toggle { display: inline-flex; align-items: center; justify-content: space-between; width: 100%; }
+                .toggle-pill { width: 48px; height: 26px; border-radius: 999px; background: #29354f; position: relative; transition: background 0.25s ease; }
+                .toggle-pill.active { background: #4b86ff; }
+                .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.25s ease; }
+                .toggle-pill.active .toggle-thumb { transform: translateX(22px); }
+                .settings-meta { color: #96b2ff; font-size: 0.95rem; }
                 .match-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 18px 20px; display: grid; gap: 12px; }
                 .match-card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 0.95rem; color: #d0d7ff; }
                 .match-card-body { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -714,12 +752,47 @@ const Dashboard = () => {
                 {view === 'settings' && (
                     <section>
                         <h3>Settings</h3>
-                        <div style={{ background: '#1f1f1f', border: '1px solid #333', borderRadius: '14px', padding: '24px', maxWidth: '700px', margin: '0 auto' }}>
-                            <p style={{ marginBottom: '14px', color: '#aaa' }}>Profile</p>
-                            <p><strong>Username:</strong> {userStats.username}</p>
-                            <p><strong>Current Elo:</strong> {userStats.elo}</p>
-                            <p><strong>Matches played:</strong> {totalGames}</p>
-                            <p style={{ marginTop: '18px', color: '#888' }}>Settings are coming soon. In the meantime, use the tabs to access your sessions and match history.</p>
+                        <div className="settings-card">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                <span style={{ fontSize: '1.1rem', color: '#7db7ff' }}>ACCESSIBILITY</span>
+                            </div>
+                            <h4>Dyslexia Friendly Mode</h4>
+                            <div className="settings-row">
+                                <div className="settings-option">
+                                    <div style={{ flex: 1 }}>
+                                        <p className="settings-label">Text Size</p>
+                                        <div className="settings-range">
+                                            <span style={{ color: '#8aa3ff' }}>Small</span>
+                                            <input
+                                                type="range"
+                                                min="100"
+                                                max="130"
+                                                value={fontSizePercent}
+                                                onChange={(e) => setFontSizePercent(Number(e.target.value))}
+                                            />
+                                            <span style={{ color: '#8aa3ff' }}>Large</span>
+                                        </div>
+                                    </div>
+                                    <div className="settings-value">{fontSizePercent}%</div>
+                                </div>
+                                <div className="settings-option">
+                                    <div>
+                                        <p className="settings-label">Dyslexia Friendly Mode</p>
+                                        <p className="settings-meta">High contrast UI and slightly larger font for easier reading.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className={`toggle-pill${dyslexiaMode ? ' active' : ''}`}
+                                        onClick={() => setDyslexiaMode((prev) => !prev)}
+                                    >
+                                        <span className="toggle-thumb" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="settings-preview">
+                                <p style={{ margin: '0 0 10px', fontWeight: 700, color: '#fff' }}>Preview</p>
+                                <p style={{ margin: 0 }}>The quick brown fox jumps over the lazy dog.</p>
+                            </div>
                         </div>
                     </section>
                 )}

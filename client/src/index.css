@@ -22,12 +22,19 @@ a:hover {
   color: #535bf2;
 }
 
+html, body, #root {
+  min-height: 100vh;
+}
+
 body {
   margin: 0;
   display: flex;
-  place-items: center;
+  justify-content: center;
+  align-items: center;
   min-width: 320px;
   min-height: 100vh;
+  width: 100%;
+  background: radial-gradient(circle at top left, #12131a 0%, #0b0d13 45%, #0f1117 100%);
 }
 
 h1 {
