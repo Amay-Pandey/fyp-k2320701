@@ -578,7 +578,7 @@ const Dashboard = () => {
                             <div className="profile-card">
                                 <h4>Recent Form</h4>
                                 {userStats.matchHistory.length > 0 ? (
-                                    userStats.matchHistory.slice(0, 4).map((m, idx) => {
+                                    userStats.matchHistory.slice().reverse().slice(0, 4).map((m, idx) => {
                                         const diff = Math.round(m.eloAfter - m.eloBefore);
                                         return (
                                             <div key={idx} className="recent-match">
@@ -682,7 +682,7 @@ const Dashboard = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {userStats.matchHistory.map((m, i) => {
+                                    {userStats.matchHistory.slice().reverse().map((m, i) => {
                                         const diff = Math.round(m.eloAfter - m.eloBefore);
                                         return (
                                             <tr key={i}>

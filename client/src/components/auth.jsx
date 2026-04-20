@@ -12,11 +12,18 @@ const Auth = ({ onLoginSuccess }) => {
         const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
         const url = `${import.meta.env.VITE_BACKEND_URL}${endpoint}`;
 
+        const payload = isLogin ? formData : {
+            username: formData.username,
+            password: formData.password,
+            age: formData.age,
+            level: formData.level || 'Beginner'
+        };
+
         try {
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
 
@@ -30,6 +37,7 @@ const Auth = ({ onLoginSuccess }) => {
             } else {
                 alert("Account created! Please login.");
                 setIsLogin(true);
+                setFormData({ username: '', password: '', age: '', level: 'Beginner' });
             }
         } catch (err) {
             setError(err.message);
@@ -99,13 +107,13 @@ const Auth = ({ onLoginSuccess }) => {
                                     value={formData.level || 'Beginner'}
                                     onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                                 >
-                                    <option value="Beginner">Beginner</option>
-                                    <option value="Weekly casual">Weekly casual</option>
-                                    <option value="Tier 1/2/3 BE">Tier 1/2/3 BE</option>
-                                    <option value="Bi-weekly casual">Bi-weekly casual</option>
-                                    <option value="Occasional tournament player">Occasional tournament player</option>
-                                    <option value="ISO medal holder">ISO medal holder</option>
-                                    <option value="Badminton England rated">Badminton England rated</option>
+                                    <option value="Beginner">Beginner (600 rating)</option>
+                                    <option value="Weekly casual">Weekly casual (800 rating)</option>
+                                    <option value="Tier 1/2/3 BE">Tier 1/2/3 BE (2000 rating)</option>
+                                    <option value="Bi-weekly casual">Bi-weekly casual (1000 rating)</option>
+                                    <option value="Occasional tournament player">Occasional tournament player (1600 rating)</option>
+                                    <option value="ISO medal holder">ISO medal holder (1800 rating)</option>
+                                    <option value="Badminton England rated">Badminton England rated (1700 rating)</option>
                                 </select>
                             </>
                         )}
