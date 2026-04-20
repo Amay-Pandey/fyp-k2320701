@@ -363,6 +363,13 @@ const Dashboard = () => {
                 .summary-card { background: #161a22; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 24px; }
                 .summary-card span { display: block; color: #a9c6ff; font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
                 .summary-card strong { display: block; color: #fff; font-size: 2rem; }
+                .match-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 18px 20px; display: grid; gap: 12px; }
+                .match-card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 0.95rem; color: #d0d7ff; }
+                .match-card-body { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+                .match-title { margin: 0; font-weight: 700; font-size: 1rem; color: #fff; }
+                .match-score { margin: 0; color: #bbb; }
+                .match-win { color: #4CAF50; font-weight: 700; }
+                .match-loss { color: #f44336; font-weight: 700; }
                 table { width: 100%; border-collapse: collapse; margin-top: 15px; }
                 th { text-align: left; color: #666; font-size: 0.8rem; text-transform: uppercase; padding: 12px; border-bottom: 1px solid #333; }
                 td { padding: 15px 12px; border-bottom: 1px solid #2a2a2a; }
@@ -408,14 +415,22 @@ const Dashboard = () => {
                         setSelectedSession(null);
                         setView('overview');
                     }}>My Stats</button>
+                    <button className={view === 'leaderboard' ? 'active' : ''} onClick={() => {
+                        setSelectedSession(null);
+                        setView('leaderboard');
+                    }}>Leaderboard</button>
                     <button className={view === 'session-history' ? 'active' : ''} onClick={() => {
                         setSelectedSession(null);
                         fetchSessionHistory();
                         setView('session-history');
-                    }}>Leaderboard</button>
-                    <button className={view === 'session-setup' ? 'active' : ''} onClick={() => {
+                    }}>Session History</button>
+                    <button className={view === 'create-session' ? 'active' : ''} onClick={() => {
                         setSelectedSession(null);
-                        setView('session-setup');
+                        setView('create-session');
+                    }}>Create Session</button>
+                    <button className={view === 'settings' ? 'active' : ''} onClick={() => {
+                        setSelectedSession(null);
+                        setView('settings');
                     }}>Settings</button>
                     {activeSession?.isActive && (
                         <button className={view === 'active-match' ? 'active' : ''} onClick={() => {
@@ -490,6 +505,33 @@ const Dashboard = () => {
                     </section>
                 )}
 
+                {view === 'leaderboard' && (
+                    <section>
+                        <h3>Recent Matches</h3>
+                        {userStats.matchHistory.length > 0 ? (
+                            <div style={{ display: 'grid', gap: '14px' }}>
+                                {userStats.matchHistory.map((match, index) => {
+                                    const diff = Math.round(match.eloAfter - match.eloBefore);
+                                    return (
+                                        <div key={index} className="match-card">
+                                            <div className="match-card-header">
+                                                <span>{new Date(match.matchDate).toLocaleDateString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className={match.isWin ? 'match-win' : 'match-loss'}>{match.isWin ? 'WIN' : 'LOSS'}</span>
+                                            </div>
+                                            <div className="match-card-body">
+                                                <p className="match-title">You vs {match.opponent}</p>
+                                                <p className="match-score">Elo change: {diff >= 0 ? `+${diff}` : diff}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p style={{ color: '#666' }}>No recent matches yet. Play a match to populate your leaderboard.</p>
+                        )}
+                    </section>
+                )}
+
                 {view === 'session-history' && (
                     <section>
                         <h3>Past Sessions</h3>
@@ -528,13 +570,26 @@ const Dashboard = () => {
                     </section>
                 )}
 
-                {view === 'session-setup' && (
+                {view === 'create-session' && (
                     <section>
-                        <h3>Start a Session</h3>
+                        <h3>Create Session</h3>
                         <SessionSetupForm 
                             onStart={() => { fetchData(); }} // Refresh data to find the new session
                             API_URL={API_URL} 
                         />
+                    </section>
+                )}
+
+                {view === 'settings' && (
+                    <section>
+                        <h3>Settings</h3>
+                        <div style={{ background: '#1f1f1f', border: '1px solid #333', borderRadius: '14px', padding: '24px', maxWidth: '700px', margin: '0 auto' }}>
+                            <p style={{ marginBottom: '14px', color: '#aaa' }}>Profile</p>
+                            <p><strong>Username:</strong> {userStats.username}</p>
+                            <p><strong>Current Elo:</strong> {userStats.elo}</p>
+                            <p><strong>Matches played:</strong> {totalGames}</p>
+                            <p style={{ marginTop: '18px', color: '#888' }}>Settings are coming soon. In the meantime, use the tabs to access your sessions and match history.</p>
+                        </div>
                     </section>
                 )}
 
