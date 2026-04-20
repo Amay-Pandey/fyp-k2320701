@@ -27,7 +27,8 @@ const sessionSchema = new mongoose.Schema({
         winner: String,
         winnerTeam: String,
         createdAt: { type: Date, default: Date.now }
-    }]
+    }],
+    endedAt: Date
 }, { timestamps: true });
 
 export default mongoose.model('Session', sessionSchema); // Change from module.exports

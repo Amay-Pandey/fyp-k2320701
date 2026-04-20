@@ -56,7 +56,6 @@ const Dashboard = () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            // Check if response is JSON, not HTML error page
             if (userRes.ok) {
                 const userData = await userRes.json();
                 setUserStats({
@@ -77,7 +76,9 @@ const Dashboard = () => {
                 const sessionData = await sessionRes.json();
                 if (sessionData) {
                     setActiveSession(sessionData);
-                    setView('active-match'); // Auto-jump to match if one exists
+                    setView(sessionData.isActive ? 'active-match' : 'session-summary');
+                } else {
+                    setActiveSession(null);
                 }
             }
         } catch (err) {
@@ -123,7 +124,31 @@ const Dashboard = () => {
 
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to end match');
-            await fetchData();
+            setActiveSession(data.session);
+            setView(data.session.isActive ? 'active-match' : 'session-summary');
+        } catch (err) {
+            setMatchActionError(err.message);
+        } finally {
+            setEndingMatchId(null);
+        }
+    };
+
+    const handleEndSession = async () => {
+        setMatchActionError('');
+        setEndingMatchId('session');
+        try {
+            const res = await fetch(`${API_URL}/api/session/close`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ sessionId: activeSession._id })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to end session');
+            setActiveSession(data.session);
+            setView('session-summary');
         } catch (err) {
             setMatchActionError(err.message);
         } finally {
@@ -239,10 +264,45 @@ const Dashboard = () => {
                     </section>
                 )}
 
+                {view === 'session-summary' && activeSession && (
+                    <section>
+                        <h2 className="text-green">Session Summary</h2>
+                        <p style={{ color: '#aaa' }}>Session: {activeSession.title || 'CourtSync Session'}</p>
+                        <div style={{ background: '#1f1f1f', border: '1px solid #333', borderRadius: '12px', padding: '20px', maxWidth: '700px', margin: '20px auto' }}>
+                            <p><strong>Total players:</strong> {activeSession.players.length}</p>
+                            <p><strong>Total matches:</strong> {activeSession.matches.length}</p>
+                            <p><strong>Completed matches:</strong> {activeSession.matches.filter((m) => m.status === 'finished').length}</p>
+                            <p><strong>Ongoing matches:</strong> {activeSession.matches.filter((m) => m.status === 'ongoing').length}</p>
+                            <p><strong>Session status:</strong> {activeSession.isActive ? 'Active' : 'Closed'}</p>
+                        </div>
+                        <div style={{ maxWidth: '700px', margin: '0 auto' }}>
+                            {activeSession.matches.map((match, idx) => (
+                                <div key={idx} style={{ background: '#252525', padding: '18px', borderRadius: '10px', marginBottom: '12px' }}>
+                                    <p style={{ fontWeight: '700' }}>Court {match.court}</p>
+                                    <p>{match.player1} & {match.player2} {match.player3 ? `vs ${match.player3} & ${match.player4}` : ''}</p>
+                                    <p>Status: {match.status.toUpperCase()}</p>
+                                    {match.status === 'finished' && (
+                                        <p>Winner: {match.winner}</p>
+                                    )}
+                                    <p>Score: {match.score?.team1} - {match.score?.team2}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <button className="btn-primary" style={{ marginTop: '20px' }} onClick={() => setView('overview')}>
+                            Back to Dashboard
+                        </button>
+                    </section>
+                )}
+
                 {view === 'active-match' && activeSession && (
                     <section style={{ textAlign: 'center', padding: '40px 0' }}>
                         <h2 className="text-green">Match in Progress</h2>
                         <p style={{ color: '#aaa', marginBottom: '10px' }}>Session: {activeSession.title || 'CourtSync Session'}</p>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <button className="btn-primary" style={{ minWidth: '140px' }} onClick={handleEndSession} disabled={endingMatchId === 'session'}>
+                                {endingMatchId === 'session' ? 'Ending Session…' : 'End Session'}
+                            </button>
+                        </div>
                         {matchActionError && <div className="error-banner" style={{ margin: '0 auto 20px', maxWidth: '700px' }}>{matchActionError}</div>}
                         <div style={{ fontSize: '1.1rem', marginBottom: '20px' }}>
                             <p>Live timer: <strong>{formatTimer(matchTimer)}</strong></p>

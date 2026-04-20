@@ -76,6 +76,50 @@ const applyRatingDelta = async (playerRecord, delta, opponentNames, match) => {
     }
 };
 
+const getOngoingPlayers = (session) => {
+    return session.matches
+        .filter((m) => m.status === 'ongoing')
+        .flatMap((m) => [m.player1, m.player2, m.player3, m.player4].filter(Boolean));
+};
+
+const getFreeCourts = (session) => {
+    const busyCourts = session.matches.filter((m) => m.status === 'ongoing').map((m) => m.court);
+    return Array.from({ length: session.numCourts }, (_, i) => i + 1).filter((court) => !busyCourts.includes(court));
+};
+
+const buildWaitingMatches = (players, freeCourts, isDoubles) => {
+    const neededPlayers = isDoubles ? 4 : 2;
+    const sortedPlayers = [...players].sort((a, b) => a.rating - b.rating);
+    const newMatches = [];
+    let courtIndex = 0;
+
+    while (sortedPlayers.length >= neededPlayers && courtIndex < freeCourts.length) {
+        const matchPlayers = sortedPlayers.splice(0, neededPlayers);
+        const match = {
+            player1: matchPlayers[0].username,
+            player2: matchPlayers[1].username,
+            court: freeCourts[courtIndex],
+            status: 'ongoing',
+            startTime: new Date(),
+            score: {
+                team1: 0,
+                team2: 0
+            },
+            matchId: `match_${Date.now()}_${freeCourts[courtIndex]}`
+        };
+
+        if (isDoubles) {
+            match.player3 = matchPlayers[2].username;
+            match.player4 = matchPlayers[3].username;
+        }
+
+        newMatches.push(match);
+        courtIndex += 1;
+    }
+
+    return newMatches;
+};
+
 export const startSession = async (req, res) => {
     try {
         const { title, numCourts, isDoubles, playerNames } = req.body;
@@ -127,10 +171,7 @@ export const endMatch = async (req, res) => {
             return res.status(404).json({ error: 'Session not found' });
         }
 
-        let match = session.matches.id(matchId);
-        if (!match) {
-            match = session.matches.find((m) => m.matchId === matchId);
-        }
+        let match = session.matches.find((m) => m.matchId === matchId);
 
         if (!match) {
             return res.status(404).json({ error: 'Match not found' });
@@ -205,6 +246,17 @@ export const endMatch = async (req, res) => {
             match.score = { ...match.score, ...score };
         }
 
+        const waitingPlayers = session.players.filter((p) => {
+            const ongoing = getOngoingPlayers(session);
+            return !ongoing.includes(p.username);
+        });
+
+        const freeCourts = getFreeCourts(session);
+        const newMatches = buildWaitingMatches(waitingPlayers, freeCourts, session.isDoubles);
+        if (newMatches.length > 0) {
+            session.matches.push(...newMatches);
+        }
+
         const hasOngoing = session.matches.some((m) => m.status === 'ongoing');
         session.isActive = hasOngoing;
 
@@ -213,6 +265,30 @@ export const endMatch = async (req, res) => {
         res.json({ message: 'Match ended', session });
     } catch (err) {
         console.error('END MATCH ERROR:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const endSession = async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        const session = await Session.findById(sessionId);
+
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        if (session.adminId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        session.isActive = false;
+        session.endedAt = new Date();
+        await session.save();
+
+        res.json({ message: 'Session closed', session });
+    } catch (err) {
+        console.error('END SESSION ERROR:', err);
         res.status(500).json({ error: err.message });
     }
 };

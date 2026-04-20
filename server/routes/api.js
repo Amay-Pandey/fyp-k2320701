@@ -3,7 +3,7 @@ const router = express.Router();
 import User from '../models/user.js';
 import Session from '../models/sessions.js'; 
 import authMiddleware from '../middleware/autho.js';
-import { startSession, endMatch } from '../controller/sessionController.js';
+import { startSession, endMatch, endSession } from '../controller/sessionController.js';
 
 // 1. GET /api/users/me (Matches your frontend request)
 // Note: If you mount this at '/api/users' in index.js, this path should be '/' or '/me'
@@ -41,5 +41,8 @@ router.post('/start', authMiddleware, startSession);
 
 // 4. POST /api/session/end
 router.post('/end', authMiddleware, endMatch);
+
+// 5. POST /api/session/close
+router.post('/close', authMiddleware, endSession);
 
 export default router;
