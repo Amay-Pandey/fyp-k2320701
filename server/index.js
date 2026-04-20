@@ -30,7 +30,7 @@ app.use('/api/session', apiRoutes);
 const buildPath = path.join(__dirname, '../client/dist');
 app.use(express.static(buildPath));
 
-app.get('/*', (req, res) => {
+app.get('/:path(.*)', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
 });
 
