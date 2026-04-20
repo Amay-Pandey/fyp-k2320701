@@ -310,53 +310,28 @@ const Dashboard = () => {
                                         )}
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                                         <div style={{ display: 'grid', gap: '8px' }}>
-                                            <label style={{ color: '#aaa' }}>Score {match.player1}</label>
+                                            <label style={{ color: '#aaa' }}>Team 1 Score</label>
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={matchScores[match.matchId]?.player1 || 0}
-                                                onChange={(e) => handleScoreChange(match.matchId, 'player1', e.target.value)}
+                                                value={matchScores[match.matchId]?.team1 || 0}
+                                                onChange={(e) => handleScoreChange(match.matchId, 'team1', e.target.value)}
                                                 style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
                                             />
                                         </div>
 
                                         <div style={{ display: 'grid', gap: '8px' }}>
-                                            <label style={{ color: '#aaa' }}>Score {match.player2}</label>
+                                            <label style={{ color: '#aaa' }}>Team 2 Score</label>
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={matchScores[match.matchId]?.player2 || 0}
-                                                onChange={(e) => handleScoreChange(match.matchId, 'player2', e.target.value)}
+                                                value={matchScores[match.matchId]?.team2 || 0}
+                                                onChange={(e) => handleScoreChange(match.matchId, 'team2', e.target.value)}
                                                 style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
                                             />
                                         </div>
-
-                                        {match.player3 && match.player4 && (
-                                            <>
-                                                <div style={{ display: 'grid', gap: '8px' }}>
-                                                    <label style={{ color: '#aaa' }}>Score {match.player3}</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={matchScores[match.matchId]?.player3 || 0}
-                                                        onChange={(e) => handleScoreChange(match.matchId, 'player3', e.target.value)}
-                                                        style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
-                                                    />
-                                                </div>
-                                                <div style={{ display: 'grid', gap: '8px' }}>
-                                                    <label style={{ color: '#aaa' }}>Score {match.player4}</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={matchScores[match.matchId]?.player4 || 0}
-                                                        onChange={(e) => handleScoreChange(match.matchId, 'player4', e.target.value)}
-                                                        style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
                                     </div>
 
                                     <button

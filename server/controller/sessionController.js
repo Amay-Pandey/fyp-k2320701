@@ -19,10 +19,8 @@ const buildMatches = (players, numCourts, isDoubles) => {
             status: 'ongoing',
             startTime: new Date(),
             score: {
-                player1: 0,
-                player2: 0,
-                player3: 0,
-                player4: 0
+                team1: 0,
+                team2: 0
             },
             matchId: `match_${Date.now()}_${court}`
         };

@@ -21,10 +21,8 @@ const sessionSchema = new mongoose.Schema({
         status: { type: String, enum: ['ongoing', 'finished'], default: 'ongoing' },
         startTime: { type: Date, default: Date.now },
         score: {
-            player1: { type: Number, default: 0 },
-            player2: { type: Number, default: 0 },
-            player3: { type: Number, default: 0 },
-            player4: { type: Number, default: 0 }
+            team1: { type: Number, default: 0 },
+            team2: { type: Number, default: 0 }
         },
         winner: String,
         winnerTeam: String,
