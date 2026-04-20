@@ -7,6 +7,11 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [activeSession, setActiveSession] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
+    const [matchTimer, setMatchTimer] = useState(0);
+    const [selectedWinner, setSelectedWinner] = useState({});
+    const [matchScores, setMatchScores] = useState({});
+    const [endingMatchId, setEndingMatchId] = useState(null);
+    const [matchActionError, setMatchActionError] = useState('');
 
     const navigate = useNavigate();
 
@@ -15,6 +20,27 @@ const Dashboard = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        const ongoingMatch = activeSession?.matches?.find((m) => m.status === 'ongoing');
+        if (!ongoingMatch) {
+            setMatchTimer(0);
+            return;
+        }
+
+        const start = ongoingMatch.startTime ? new Date(ongoingMatch.startTime).getTime() : Date.now();
+        const updateTimer = () => setMatchTimer(Math.floor((Date.now() - start) / 1000));
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [activeSession]);
+
+    const formatTimer = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
     const fetchData = async () => {
         setErrorMessage('');
@@ -60,6 +86,59 @@ const Dashboard = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleEndMatch = async (match) => {
+        setMatchActionError('');
+        const winner = selectedWinner[match.matchId];
+
+        if (!winner) {
+            setMatchActionError('Select a winner before finishing the match.');
+            return;
+        }
+
+        setEndingMatchId(match.matchId);
+        try {
+            const currentScore = matchScores[match.matchId] || {};
+            const payload = {
+                sessionId: activeSession._id,
+                matchId: match.matchId,
+                score: currentScore
+            };
+
+            if (match.player3 && match.player4) {
+                payload.winnerTeam = winner;
+            } else {
+                payload.winnerName = winner;
+            }
+
+            const res = await fetch(`${API_URL}/api/session/end`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to end match');
+            await fetchData();
+        } catch (err) {
+            setMatchActionError(err.message);
+        } finally {
+            setEndingMatchId(null);
+        }
+    };
+
+    const handleScoreChange = (matchId, field, value) => {
+        setMatchScores((prev) => ({
+            ...prev,
+            [matchId]: {
+                ...prev[matchId],
+                [field]: Number(value)
+            }
+        }));
     };
 
     const handleLogout = () => {
@@ -163,22 +242,136 @@ const Dashboard = () => {
                 {view === 'active-match' && activeSession && (
                     <section style={{ textAlign: 'center', padding: '40px 0' }}>
                         <h2 className="text-green">Match in Progress</h2>
-                        <div style={{ fontSize: '1.2rem', marginBottom: '20px' }}>
-                            {activeSession.matches?.filter(m => m.status === 'ongoing').length > 0 ? (
-                                activeSession.matches.filter(m => m.status === 'ongoing').map((match, idx) => (
-                                    <div key={idx} style={{ background: '#252525', padding: '20px', borderRadius: '10px', marginBottom: '10px' }}>
-                                        <p>Court <strong>{match.court}</strong></p>
-                                        <p>{match.player1} <span style={{ color: '#666' }}>vs</span> {match.player2}</p>
-                                        {match.player3 && <p><span style={{ color: '#666' }}>&</span> {match.player3} <span style={{ color: '#666' }}>vs</span> {match.player4}</p>}
-                                        <button className="btn-primary" style={{ marginTop: '10px' }} onClick={() => alert('Feature coming soon: Finishing the match!')}>
-                                            Finish Match
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <p>All matches finished. Generating next round...</p>
-                            )}
+                        <p style={{ color: '#aaa', marginBottom: '10px' }}>Session: {activeSession.title || 'CourtSync Session'}</p>
+                        {matchActionError && <div className="error-banner" style={{ margin: '0 auto 20px', maxWidth: '700px' }}>{matchActionError}</div>}
+                        <div style={{ fontSize: '1.1rem', marginBottom: '20px' }}>
+                            <p>Live timer: <strong>{formatTimer(matchTimer)}</strong></p>
                         </div>
+                        {activeSession.matches?.filter(m => m.status === 'ongoing').length > 0 ? (
+                            activeSession.matches.filter(m => m.status === 'ongoing').map((match, idx) => (
+                                <div key={idx} style={{ background: '#252525', padding: '20px', borderRadius: '10px', marginBottom: '20px', textAlign: 'left' }}>
+                                    <p><strong>Court {match.court}</strong></p>
+                                    <p style={{ margin: '6px 0' }}>
+                                        <strong>{match.player1}</strong> <span style={{ color: '#666' }}>vs</span> <strong>{match.player2}</strong>
+                                    </p>
+                                    {match.player3 && match.player4 && (
+                                        <p style={{ margin: '6px 0' }}>
+                                            <strong>{match.player3}</strong> <span style={{ color: '#666' }}>vs</span> <strong>{match.player4}</strong>
+                                        </p>
+                                    )}
+
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
+                                        {match.player3 && match.player4 ? (
+                                            <>
+                                                <label style={{ color: '#ddd' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name={`winner-${match.matchId}`}
+                                                        value="team1"
+                                                        checked={selectedWinner[match.matchId] === 'team1'}
+                                                        onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
+                                                    />
+                                                    Team 1: {match.player1} & {match.player2}
+                                                </label>
+                                                <label style={{ color: '#ddd' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name={`winner-${match.matchId}`}
+                                                        value="team2"
+                                                        checked={selectedWinner[match.matchId] === 'team2'}
+                                                        onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
+                                                    />
+                                                    Team 2: {match.player3} & {match.player4}
+                                                </label>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <label style={{ color: '#ddd' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name={`winner-${match.matchId}`}
+                                                        value={match.player1}
+                                                        checked={selectedWinner[match.matchId] === match.player1}
+                                                        onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
+                                                    />
+                                                    {match.player1} wins
+                                                </label>
+                                                <label style={{ color: '#ddd' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name={`winner-${match.matchId}`}
+                                                        value={match.player2}
+                                                        checked={selectedWinner[match.matchId] === match.player2}
+                                                        onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
+                                                    />
+                                                    {match.player2} wins
+                                                </label>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'grid', gap: '8px' }}>
+                                            <label style={{ color: '#aaa' }}>Score {match.player1}</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={matchScores[match.matchId]?.player1 || 0}
+                                                onChange={(e) => handleScoreChange(match.matchId, 'player1', e.target.value)}
+                                                style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
+                                            />
+                                        </div>
+
+                                        <div style={{ display: 'grid', gap: '8px' }}>
+                                            <label style={{ color: '#aaa' }}>Score {match.player2}</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={matchScores[match.matchId]?.player2 || 0}
+                                                onChange={(e) => handleScoreChange(match.matchId, 'player2', e.target.value)}
+                                                style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
+                                            />
+                                        </div>
+
+                                        {match.player3 && match.player4 && (
+                                            <>
+                                                <div style={{ display: 'grid', gap: '8px' }}>
+                                                    <label style={{ color: '#aaa' }}>Score {match.player3}</label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={matchScores[match.matchId]?.player3 || 0}
+                                                        onChange={(e) => handleScoreChange(match.matchId, 'player3', e.target.value)}
+                                                        style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
+                                                    />
+                                                </div>
+                                                <div style={{ display: 'grid', gap: '8px' }}>
+                                                    <label style={{ color: '#aaa' }}>Score {match.player4}</label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={matchScores[match.matchId]?.player4 || 0}
+                                                        onChange={(e) => handleScoreChange(match.matchId, 'player4', e.target.value)}
+                                                        style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #444', background: '#1a1a1a', color: '#fff' }}
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        className="btn-primary"
+                                        style={{ marginTop: '18px' }}
+                                        onClick={() => handleEndMatch(match)}
+                                        disabled={endingMatchId === match.matchId}
+                                    >
+                                        {endingMatchId === match.matchId ? 'Ending…' : 'Finish Match'}
+                                    </button>
+                                </div>
+                            ))
+                        ) : (
+                            <p>All matches finished. Generating next round...</p>
+                        )}
                     </section>
                 )}
             </div>

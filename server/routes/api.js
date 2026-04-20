@@ -3,6 +3,7 @@ const router = express.Router();
 import User from '../models/user.js';
 import Session from '../models/sessions.js'; 
 import authMiddleware from '../middleware/autho.js';
+import { startSession, endMatch } from '../controller/sessionController.js';
 
 // 1. GET /api/users/me (Matches your frontend request)
 // Note: If you mount this at '/api/users' in index.js, this path should be '/' or '/me'
@@ -36,33 +37,9 @@ router.get('/active', authMiddleware, async (req, res) => {
 });
 
 // 3. POST /api/session/start
-router.post('/start', authMiddleware, async (req, res) => {
-    try {
-        const { title, numCourts, isDoubles, playerNames } = req.body;
-        
-        if (!playerNames) {
-            return res.status(400).json({ error: "Player names are required" });
-        }
+router.post('/start', authMiddleware, startSession);
 
-        const playersArray = playerNames.split(',').map(name => ({
-            username: name.trim(),
-            rating: 1500 
-        }));
-
-        const newSession = new Session({
-            title,
-            numCourts,
-            isDoubles,
-            players: playersArray,
-            isActive: true
-        });
-
-        await newSession.save();
-        res.status(201).json(newSession);
-    } catch (err) {
-        console.error("START Error:", err.message);
-        res.status(500).json({ error: "Failed to create session" });
-    }
-});
+// 4. POST /api/session/end
+router.post('/end', authMiddleware, endMatch);
 
 export default router;
