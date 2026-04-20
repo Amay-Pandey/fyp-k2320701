@@ -5,6 +5,9 @@ const Dashboard = () => {
     const [view, setView] = useState('overview'); 
     const [userStats, setUserStats] = useState({ elo: 1500, username: '', matchHistory: [] });
     const [loading, setLoading] = useState(true);
+    const [leaderboardRows, setLeaderboardRows] = useState([]);
+    const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+    const [leaderboardError, setLeaderboardError] = useState('');
     const [activeSession, setActiveSession] = useState(null);
     const [selectedSession, setSelectedSession] = useState(null);
     const [sessionHistory, setSessionHistory] = useState([]);
@@ -53,31 +56,37 @@ const Dashboard = () => {
     })();
     const streakLabel = currentStreak >= 0 ? `${currentStreak} Wins` : `${-currentStreak} Loss`;
 
-    const leaderboardRows = [
-        {
-            rank: 1,
-            player: userStats.username || 'You',
-            rating: userStats.elo,
-            games: totalGames,
-            wins: totalWins,
-            winRate,
-            achievements: totalGames >= 10 ? ['Top Skill', '10 Games'] : ['Active Player']
-        },
-        { rank: 2, player: 'Marcus Johnson', rating: 1483, games: 14, wins: 10, winRate: 71, achievements: ['Consistent', '10 Games'] },
-        { rank: 3, player: 'Mike Rodriguez', rating: 1459, games: 13, wins: 9, winRate: 69, achievements: ['Hot Streak'] },
-        { rank: 4, player: 'Tom Anderson', rating: 1424, games: 12, wins: 8, winRate: 67, achievements: ['Rising Star'] },
-        { rank: 5, player: 'Emma Watson', rating: 1411, games: 11, wins: 7, winRate: 64, achievements: ['10 Games'] },
-        { rank: 6, player: 'Kevin Lee', rating: 1399, games: 11, wins: 7, winRate: 64, achievements: ['Active'] },
-        { rank: 7, player: 'Rachel Green', rating: 1387, games: 10, wins: 6, winRate: 60, achievements: ['10 Games'] },
-        { rank: 8, player: 'Amy Zhang', rating: 1375, games: 9, wins: 5, winRate: 56, achievements: ['Rising Star'] }
-    ];
-
     const isMatchComplete = (match) => {
         if (!activeSession) return false;
         if (activeSession.isDoubles) {
             return Boolean(match.player1 && match.player2 && match.player3 && match.player4);
         }
         return Boolean(match.player1 && match.player2);
+    };
+
+    const fetchLeaderboard = async () => {
+        setLeaderboardLoading(true);
+        setLeaderboardError('');
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/session/leaderboard`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to load leaderboard');
+            }
+
+            const data = await res.json();
+            setLeaderboardRows(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Leaderboard fetch error:', err);
+            setLeaderboardError('Could not load leaderboard.');
+            setLeaderboardRows([]);
+        } finally {
+            setLeaderboardLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -148,6 +157,7 @@ const Dashboard = () => {
 
             // 3. Fetch Session History for browsing old sessions
             await fetchSessionHistory();
+            await fetchLeaderboard();
         } catch (err) {
             console.error("Dashboard Fetch Error:", err);
             setErrorMessage('Connection lost. Please refresh or check backend logs.');
@@ -455,6 +465,7 @@ const Dashboard = () => {
                     <button className={view === 'leaderboard' ? 'active' : ''} onClick={() => {
                         setSelectedSession(null);
                         setView('leaderboard');
+                        fetchLeaderboard();
                     }}>Leaderboard</button>
                     <button className={view === 'match-history' ? 'active' : ''} onClick={() => {
                         setSelectedSession(null);
@@ -555,56 +566,67 @@ const Dashboard = () => {
                 {view === 'leaderboard' && (
                     <section>
                         <h3>Leaderboard</h3>
-                        <div style={{ overflowX: 'auto' }}>
-                            <table className="leaderboard-table">
-                                <thead>
-                                    <tr>
-                                        <th>Rank</th>
-                                        <th>Player</th>
-                                        <th>Skill Level</th>
-                                        <th>Games</th>
-                                        <th>Wins</th>
-                                        <th>Win Rate</th>
-                                        <th>Achievements</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {leaderboardRows.map((row) => (
-                                        <tr key={row.rank} className="leaderboard-row">
-                                            <td>{row.rank}</td>
-                                            <td className="player-name">{row.player}</td>
-                                            <td>{row.rating}</td>
-                                            <td>{row.games}</td>
-                                            <td>{row.wins}</td>
-                                            <td className={row.winRate >= 65 ? 'text-green' : 'text-red'}>{row.winRate}%</td>
-                                            <td>
-                                                {row.achievements.map((tag, index) => (
-                                                    <span key={index} className="achievement-pill">{tag}</span>
-                                                ))}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="leaderboard-summary">
-                            <div className="summary-pill">
-                                <span>Total Matches</span>
-                                <strong>{totalGames}</strong>
-                            </div>
-                            <div className="summary-pill">
-                                <span>Avg Win Rate</span>
-                                <strong>{winRate}%</strong>
-                            </div>
-                            <div className="summary-pill">
-                                <span>Top Skill</span>
-                                <strong>{userStats.elo}</strong>
-                            </div>
-                            <div className="summary-pill">
-                                <span>Active Players</span>
-                                <strong>{activeSession?.players?.length || 8}</strong>
-                            </div>
-                        </div>
+                        {leaderboardLoading ? (
+                            <p style={{ color: '#aaa' }}>Loading leaderboard...</p>
+                        ) : leaderboardError ? (
+                            <p style={{ color: '#f44336' }}>{leaderboardError}</p>
+                        ) : (
+                            <>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table className="leaderboard-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Rank</th>
+                                                <th>Player</th>
+                                                <th>Skill Level</th>
+                                                <th>Games</th>
+                                                <th>Wins</th>
+                                                <th>Win Rate</th>
+                                                <th>Achievements</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {leaderboardRows.map((row) => (
+                                                <tr key={`${row.player}-${row.rank}`} className="leaderboard-row">
+                                                    <td>{row.rank}</td>
+                                                    <td className="player-name">{row.player}</td>
+                                                    <td>{row.rating}</td>
+                                                    <td>{row.games}</td>
+                                                    <td>{row.wins}</td>
+                                                    <td className={row.winRate >= 65 ? 'text-green' : 'text-red'}>{row.winRate}%</td>
+                                                    <td>
+                                                        {row.achievements.map((tag, index) => (
+                                                            <span key={index} className="achievement-pill">{tag}</span>
+                                                        ))}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {leaderboardRows.length === 0 && (
+                                    <p style={{ color: '#666', marginTop: '18px' }}>No shared session users found. Your leaderboard is limited to your account.</p>
+                                )}
+                                <div className="leaderboard-summary">
+                                    <div className="summary-pill">
+                                        <span>Total Matches</span>
+                                        <strong>{totalGames}</strong>
+                                    </div>
+                                    <div className="summary-pill">
+                                        <span>Avg Win Rate</span>
+                                        <strong>{winRate}%</strong>
+                                    </div>
+                                    <div className="summary-pill">
+                                        <span>Top Skill</span>
+                                        <strong>{userStats.elo}</strong>
+                                    </div>
+                                    <div className="summary-pill">
+                                        <span>Active Players</span>
+                                        <strong>{activeSession?.players?.length || 8}</strong>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </section>
                 )}
 

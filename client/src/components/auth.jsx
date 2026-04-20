@@ -37,45 +37,90 @@ const Auth = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div style={{ maxWidth: '300px', margin: '50px auto' }}>
-            <h2>{isLogin ? 'Login' : 'Register'}</h2>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <input
-                    type="text" placeholder="Username" required
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    style={{ display: 'block', width: '100%', marginBottom: '10px' }}
-                />
-                <input
-                    type="password" placeholder="Password" required
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    style={{ display: 'block', width: '100%', marginBottom: '10px' }}
-                />
-                
-                {!isLogin && (
-                    <>
+        <div className="auth-page">
+            <style>{`
+                .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0f1117; padding: 24px; font-family: 'Inter', sans-serif; }
+                .auth-card { width: min(520px, 100%); background: #141821; border: 1px solid #242a35; border-radius: 24px; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35); overflow: hidden; }
+                .auth-header { background: linear-gradient(135deg, #1d2b64, #1c92d2); padding: 32px 28px; color: #fff; }
+                .auth-header h1 { margin: 0; font-size: 2rem; letter-spacing: 0.12em; text-transform: uppercase; }
+                .auth-header p { margin: 10px 0 0; color: rgba(255,255,255,0.85); font-size: 0.95rem; }
+                .auth-body { padding: 32px 28px 28px; display: grid; gap: 20px; }
+                .auth-switch { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+                .auth-switch button { border: none; background: transparent; color: #7da7ff; cursor: pointer; font-weight: 600; }
+                .auth-switch button.active { color: #fff; }
+                .auth-form { display: grid; gap: 16px; }
+                .auth-form input, .auth-form select { width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid #2e3340; background: #0f131a; color: #eef2ff; font-size: 0.95rem; }
+                .auth-form input::placeholder, .auth-form select { color: #8fa3c5; }
+                .auth-form button { border: none; border-radius: 14px; padding: 14px 16px; background: linear-gradient(135deg, #4b86ff, #66d4ff); color: #08101e; font-weight: 700; cursor: pointer; transition: transform 0.2s ease; }
+                .auth-form button:hover { transform: translateY(-1px); }
+                .auth-footer { color: #c7d2ff; font-size: 0.95rem; text-align: center; }
+                .auth-footer span { color: #7da7ff; cursor: pointer; }
+                .auth-error { color: #ff6f6f; padding: 12px 16px; border-radius: 12px; background: rgba(244, 67, 54, 0.12); border: 1px solid rgba(244, 67, 54, 0.25); }
+            `}</style>
+
+            <div className="auth-card">
+                <div className="auth-header">
+                    <h1>COURT SYNC</h1>
+                    <p>{isLogin ? 'Sign in to access your player portal and match dashboard.' : 'Create your account to join sessions and track your progress.'}</p>
+                </div>
+
+                <div className="auth-body">
+                    {error && <div className="auth-error">{error}</div>}
+
+                    <div className="auth-switch">
+                        <button className={isLogin ? 'active' : ''} onClick={() => setIsLogin(true)}>Login</button>
+                        <button className={!isLogin ? 'active' : ''} onClick={() => setIsLogin(false)}>Register</button>
+                    </div>
+
+                    <form className="auth-form" onSubmit={handleSubmit}>
                         <input
-                            type="number" placeholder="Age"
-                            onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                            type="text"
+                            placeholder="Username"
+                            required
+                            value={formData.username}
+                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                         />
-                        <select onChange={(e) => setFormData({ ...formData, level: e.target.value })}>
-                            <option value="Beginner">Beginner</option>
-                            <option value="Weekly casual">Weekly casual</option>
-                            <option value="Tier 1/2/3 BE">Tier 1/2/3 BE</option>
-                            <option value="Bi-weekly casual">Bi-weekly casual</option>
-                            <option value="Occasional tournament player">Occasional tournament player</option>
-                            <option value="ISO medal holder">ISO medal holder</option>
-                            <option value="Badminton England rated">Badminton England rated</option>
-                        </select>
-                    </>
-                )}
-                <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#2196F3', color: 'white', border: 'none' }}>
-                    {isLogin ? 'Login' : 'Sign Up'}
-                </button>
-            </form>
-            <p onClick={() => setIsLogin(!isLogin)} style={{ cursor: 'pointer', color: 'blue', marginTop: '10px' }}>
-                {isLogin ? 'Need an account? Register' : 'Have an account? Login'}
-            </p>
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            required
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        />
+                        {!isLogin && (
+                            <>
+                                <input
+                                    type="number"
+                                    placeholder="Age"
+                                    value={formData.age || ''}
+                                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                                />
+                                <select
+                                    value={formData.level || 'Beginner'}
+                                    onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                                >
+                                    <option value="Beginner">Beginner</option>
+                                    <option value="Weekly casual">Weekly casual</option>
+                                    <option value="Tier 1/2/3 BE">Tier 1/2/3 BE</option>
+                                    <option value="Bi-weekly casual">Bi-weekly casual</option>
+                                    <option value="Occasional tournament player">Occasional tournament player</option>
+                                    <option value="ISO medal holder">ISO medal holder</option>
+                                    <option value="Badminton England rated">Badminton England rated</option>
+                                </select>
+                            </>
+                        )}
+                        <button type="submit">{isLogin ? 'Login' : 'Create Account'}</button>
+                    </form>
+
+                    <div className="auth-footer">
+                        {isLogin ? (
+                            <span onClick={() => setIsLogin(false)}>Need an account? Register</span>
+                        ) : (
+                            <span onClick={() => setIsLogin(true)}>Have an account? Login</span>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

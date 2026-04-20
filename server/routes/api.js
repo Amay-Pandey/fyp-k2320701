@@ -55,7 +55,79 @@ router.get('/history', authMiddleware, async (req, res) => {
     }
 });
 
-// 4. GET /api/session/:id
+// 4. GET /api/session/leaderboard
+router.get('/leaderboard', authMiddleware, async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.user.id).select('username rating matchHistory');
+        if (!currentUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const sessions = await Session.find({
+            $or: [
+                { adminId: req.user.id },
+                { 'players.username': currentUser.username }
+            ]
+        }).lean();
+
+        const sharedUsernames = new Set();
+        const adminIds = new Set();
+
+        sessions.forEach((session) => {
+            session.players.forEach((player) => {
+                if (player.username && player.username !== currentUser.username) {
+                    sharedUsernames.add(player.username);
+                }
+            });
+            if (session.adminId && session.adminId.toString() !== req.user.id) {
+                adminIds.add(session.adminId.toString());
+            }
+        });
+
+        if (adminIds.size > 0) {
+            const admins = await User.find({ _id: { $in: Array.from(adminIds) } }).select('username');
+            admins.forEach((admin) => sharedUsernames.add(admin.username));
+        }
+
+        const usernames = Array.from(sharedUsernames);
+        const leaderboardUsers = await User.find({ username: { $in: [...usernames, currentUser.username] } })
+            .select('username rating matchHistory')
+            .lean();
+
+        const buildAchievements = (games, winRate) => {
+            const tags = [];
+            if (games >= 10) tags.push('10 Games');
+            if (winRate >= 75) tags.push('Hot Streak');
+            else if (winRate >= 60) tags.push('Consistent');
+            if (!tags.length) tags.push('Rising Star');
+            return tags;
+        };
+
+        const rows = leaderboardUsers.map((user) => {
+            const games = (user.matchHistory || []).length;
+            const wins = (user.matchHistory || []).filter((match) => match.isWin).length;
+            const winRate = games > 0 ? Math.round((wins / games) * 100) : 0;
+            return {
+                player: user.username,
+                rating: user.rating || 1500,
+                games,
+                wins,
+                winRate,
+                achievements: buildAchievements(games, winRate)
+            };
+        });
+
+        rows.sort((a, b) => b.rating - a.rating || a.player.localeCompare(b.player));
+        const ranked = rows.map((row, index) => ({ rank: index + 1, ...row }));
+
+        res.json(ranked);
+    } catch (err) {
+        console.error('LEADERBOARD ERROR:', err);
+        res.status(500).json({ error: 'Server error fetching leaderboard' });
+    }
+});
+
+// 5. GET /api/session/:id
 router.get('/:id', authMiddleware, async (req, res) => {
     try {
         const session = await Session.findOne({ _id: req.params.id, adminId: req.user.id });
