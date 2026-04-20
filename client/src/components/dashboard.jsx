@@ -34,6 +34,25 @@ const Dashboard = () => {
         return formatTimer(Math.floor((Date.now() - start) / 1000));
     };
 
+    const totalGames = userStats.matchHistory.length;
+    const totalWins = userStats.matchHistory.filter((match) => match.isWin).length;
+    const winRate = totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
+    const currentStreak = (() => {
+        let streak = 0;
+        for (let i = userStats.matchHistory.length - 1; i >= 0; i -= 1) {
+            if (userStats.matchHistory[i].isWin) {
+                streak += 1;
+            } else if (streak > 0) {
+                break;
+            } else {
+                streak -= 1;
+                break;
+            }
+        }
+        return streak;
+    })();
+    const streakLabel = currentStreak >= 0 ? `${currentStreak} Wins` : `${-currentStreak} Loss`;
+
     const isMatchComplete = (match) => {
         if (!activeSession) return false;
         if (activeSession.isDoubles) {
@@ -325,6 +344,25 @@ const Dashboard = () => {
                 nav { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 1px solid #333; padding-bottom: 15px; }
                 nav button { background: transparent; color: #888; border: none; padding: 10px 20px; cursor: pointer; font-weight: 600; transition: 0.2s; }
                 nav button.active { color: #fff; border-bottom: 2px solid #4CAF50; }
+                .topbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; background: linear-gradient(135deg, #1d2b64, #1c92d2); padding: 24px 28px; border-radius: 20px; margin-bottom: 20px; color: #fff; }
+                .brand { font-size: 1.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+                .brand strong { font-weight: 800; }
+                .subtext { margin: 6px 0 0; color: rgba(255,255,255,0.85); font-size: 0.95rem; }
+                .user-slot { display: flex; gap: 18px; align-items: center; }
+                .user-slot .small-label { margin: 0 0 4px; color: rgba(255,255,255,0.7); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.14em; }
+                .top-tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+                .top-tabs button { background: #171a20; color: #b5b8c7; border: 1px solid transparent; border-radius: 999px; padding: 12px 20px; transition: all 0.2s ease; }
+                .top-tabs button.active { background: #2f7be5; color: #fff; border-color: rgba(75,154,255,0.35); }
+                .hero-card { display: flex; justify-content: space-between; align-items: center; gap: 20px; background: linear-gradient(135deg, #3e70d1, #22c1c3); padding: 26px 30px; border-radius: 22px; margin-bottom: 20px; box-shadow: 0 20px 55px rgba(0, 0, 0, 0.18); }
+                .hero-card h2 { margin: 0; font-size: 2rem; letter-spacing: 0.02em; }
+                .hero-card p { margin: 10px 0 0; color: rgba(255,255,255,0.92); }
+                .rank-badge { background: rgba(255,255,255,0.13); padding: 20px 24px; border-radius: 20px; text-align: center; min-width: 132px; }
+                .rank-badge span { display: block; color: rgba(255,255,255,0.8); font-size: 0.82rem; letter-spacing: 0.16em; text-transform: uppercase; }
+                .rank-badge strong { display: block; margin-top: 10px; font-size: 2.1rem; }
+                .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 30px; }
+                .summary-card { background: #161a22; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 24px; }
+                .summary-card span { display: block; color: #a9c6ff; font-size: 0.85rem; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
+                .summary-card strong { display: block; color: #fff; font-size: 2rem; }
                 table { width: 100%; border-collapse: collapse; margin-top: 15px; }
                 th { text-align: left; color: #666; font-size: 0.8rem; text-transform: uppercase; padding: 12px; border-bottom: 1px solid #333; }
                 td { padding: 15px 12px; border-bottom: 1px solid #2a2a2a; }
@@ -335,37 +373,50 @@ const Dashboard = () => {
                 .setup-form input, .setup-form textarea, .setup-form select { background: #2a2a2a; border: 1px solid #444; color: white; padding: 12px; border-radius: 6px; }
                 .btn-primary { background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
                 .logout-btn { background: #333; color: #ff5252; border: 1px solid #444; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
+                @media (max-width: 960px) {
+                    .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                }
+                @media (max-width: 700px) {
+                    .topbar, .hero-card { flex-direction: column; align-items: flex-start; }
+                    .top-tabs { justify-content: center; }
+                    .summary-grid { grid-template-columns: 1fr; }
+                }
                 `}
             </style>
 
             <div className="dash-card">
                 {errorMessage && <div className="error-banner">{errorMessage}</div>}
                 
-                <header>
+                <header className="topbar">
                     <div>
-                        <h1 style={{ margin: 0 }}>CourtSync</h1>
-                        <p style={{ color: '#888' }}>Logged in as <strong>{userStats.username}</strong></p>
+                        <div className="brand">
+                            <span>COURT</span><strong>SYNC</strong>
+                        </div>
+                        <p className="subtext">Player Portal</p>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                        <div className="elo-display">{Math.round(userStats.elo)}</div>
+                    <div className="user-slot">
+                        <div>
+                            <p className="small-label">Logged in as</p>
+                            <strong>{userStats.username}</strong>
+                        </div>
                         <button className="logout-btn" onClick={handleLogout}>Logout</button>
                     </div>
                 </header>
 
-                <nav>
+                <nav className="top-tabs">
                     <button className={view === 'overview' ? 'active' : ''} onClick={() => {
                         setSelectedSession(null);
                         setView('overview');
-                    }}>Match History</button>
+                    }}>My Stats</button>
                     <button className={view === 'session-history' ? 'active' : ''} onClick={() => {
                         setSelectedSession(null);
                         fetchSessionHistory();
                         setView('session-history');
-                    }}>Session History</button>
+                    }}>Leaderboard</button>
                     <button className={view === 'session-setup' ? 'active' : ''} onClick={() => {
                         setSelectedSession(null);
                         setView('session-setup');
-                    }}>New Session</button>
+                    }}>Settings</button>
                     {activeSession?.isActive && (
                         <button className={view === 'active-match' ? 'active' : ''} onClick={() => {
                             setSelectedSession(null);
@@ -375,6 +426,36 @@ const Dashboard = () => {
                         </button>
                     )}
                 </nav>
+
+                <section className="hero-card">
+                    <div>
+                        <h2>WELCOME BACK, {userStats.username.toUpperCase()}</h2>
+                        <p>Your rank in the last session was #{userStats.matchHistory.length > 0 ? 1 : '-'}</p>
+                    </div>
+                    <div className="rank-badge">
+                        <span>RANK</span>
+                        <strong>#{userStats.matchHistory.length > 0 ? 1 : '-'}</strong>
+                    </div>
+                </section>
+
+                <section className="summary-grid">
+                    <div className="summary-card">
+                        <span>Games Played</span>
+                        <strong>{totalGames}</strong>
+                    </div>
+                    <div className="summary-card">
+                        <span>Wins</span>
+                        <strong>{totalWins}</strong>
+                    </div>
+                    <div className="summary-card">
+                        <span>Win Rate</span>
+                        <strong>{winRate}%</strong>
+                    </div>
+                    <div className="summary-card">
+                        <span>Current Streak</span>
+                        <strong>{streakLabel}</strong>
+                    </div>
+                </section>
 
                 {view === 'overview' && (
                     <section>
