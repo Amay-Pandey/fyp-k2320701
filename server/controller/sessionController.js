@@ -83,6 +83,12 @@ export const startSession = async (req, res) => {
         const { title, numCourts, isDoubles, playerNames } = req.body;
         const nameArray = playerNames.split(',').map((n) => n.trim()).filter(Boolean);
 
+        if (nameArray.length < (isDoubles ? 4 : 2)) {
+            return res.status(400).json({ error: `Please enter at least ${isDoubles ? 4 : 2} player names.` });
+        }
+
+        await Session.updateMany({ adminId: req.user.id, isActive: true }, { $set: { isActive: false } });
+
         const playerObjects = await Promise.all(nameArray.map(async (name) => {
             const user = await User.findOne({ username: name });
             return {
