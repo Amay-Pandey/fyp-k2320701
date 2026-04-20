@@ -34,6 +34,14 @@ const Dashboard = () => {
         return formatTimer(Math.floor((Date.now() - start) / 1000));
     };
 
+    const isMatchComplete = (match) => {
+        if (!activeSession) return false;
+        if (activeSession.isDoubles) {
+            return Boolean(match.player1 && match.player2 && match.player3 && match.player4);
+        }
+        return Boolean(match.player1 && match.player2);
+    };
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -549,52 +557,58 @@ const Dashboard = () => {
                                     ) : null}
 
                                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
-                                        {match.player3 && match.player4 ? (
-                                            <>
-                                                <label style={{ color: '#ddd' }}>
-                                                    <input
-                                                        type="radio"
-                                                        name={`winner-${match.matchId}`}
-                                                        value="team1"
-                                                        checked={selectedWinner[match.matchId] === 'team1'}
-                                                        onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
-                                                    />
-                                                    Team 1: {match.player1} & {match.player2}
-                                                </label>
-                                                <label style={{ color: '#ddd' }}>
-                                                    <input
-                                                        type="radio"
-                                                        name={`winner-${match.matchId}`}
-                                                        value="team2"
-                                                        checked={selectedWinner[match.matchId] === 'team2'}
-                                                        onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
-                                                    />
-                                                    Team 2: {match.player3} & {match.player4}
-                                                </label>
-                                            </>
+                                        {isMatchComplete(match) ? (
+                                            match.player3 && match.player4 ? (
+                                                <>
+                                                    <label style={{ color: '#ddd' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`winner-${match.matchId}`}
+                                                            value="team1"
+                                                            checked={selectedWinner[match.matchId] === 'team1'}
+                                                            onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
+                                                        />
+                                                        Team 1: {match.player1} & {match.player2}
+                                                    </label>
+                                                    <label style={{ color: '#ddd' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`winner-${match.matchId}`}
+                                                            value="team2"
+                                                            checked={selectedWinner[match.matchId] === 'team2'}
+                                                            onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
+                                                        />
+                                                        Team 2: {match.player3} & {match.player4}
+                                                    </label>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <label style={{ color: '#ddd' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`winner-${match.matchId}`}
+                                                            value={match.player1}
+                                                            checked={selectedWinner[match.matchId] === match.player1}
+                                                            onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
+                                                        />
+                                                        {match.player1} wins
+                                                    </label>
+                                                    <label style={{ color: '#ddd' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`winner-${match.matchId}`}
+                                                            value={match.player2}
+                                                            checked={selectedWinner[match.matchId] === match.player2}
+                                                            onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
+                                                        />
+                                                        {match.player2} wins
+                                                    </label>
+                                                </>
+                                            )
                                         ) : (
-                                            <>
-                                                <label style={{ color: '#ddd' }}>
-                                                    <input
-                                                        type="radio"
-                                                        name={`winner-${match.matchId}`}
-                                                        value={match.player1}
-                                                        checked={selectedWinner[match.matchId] === match.player1}
-                                                        onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
-                                                    />
-                                                    {match.player1} wins
-                                                </label>
-                                                <label style={{ color: '#ddd' }}>
-                                                    <input
-                                                        type="radio"
-                                                        name={`winner-${match.matchId}`}
-                                                        value={match.player2}
-                                                        checked={selectedWinner[match.matchId] === match.player2}
-                                                        onChange={(e) => setSelectedWinner({ ...selectedWinner, [match.matchId]: e.target.value })}
-                                                    />
-                                                    {match.player2} wins
-                                                </label>
-                                            </>
+                                            <div style={{ color: '#f0a500', fontSize: '0.95rem' }}>
+                                                Match line-up is incomplete. Fill all required player spots before finishing this match.
+                                            </div>
                                         )}
                                     </div>
 
@@ -669,7 +683,7 @@ const Dashboard = () => {
                                         className="btn-primary"
                                         style={{ marginTop: '18px' }}
                                         onClick={() => handleEndMatch(match)}
-                                        disabled={endingMatchId === match.matchId}
+                                        disabled={endingMatchId === match.matchId || !isMatchComplete(match)}
                                     >
                                         {endingMatchId === match.matchId ? 'Ending…' : 'Finish Match'}
                                     </button>

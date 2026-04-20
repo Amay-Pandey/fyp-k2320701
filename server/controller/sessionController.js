@@ -251,6 +251,13 @@ export const endMatch = async (req, res) => {
             return res.status(400).json({ error: 'Match already ended' });
         }
 
+        const requiredPlayers = session.isDoubles
+            ? [match.player1, match.player2, match.player3, match.player4]
+            : [match.player1, match.player2];
+        if (requiredPlayers.some((player) => !player)) {
+            return res.status(400).json({ error: 'Cannot finish a match with a vacant player spot. Fill all required slots before ending the match.' });
+        }
+
         const winnerNames = match.player3 && match.player4
             ? (winnerTeam === 'team2' ? [match.player3, match.player4] : [match.player1, match.player2])
             : [winnerName];
