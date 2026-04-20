@@ -2,6 +2,7 @@ import Session from '../models/sessions.js';
 import User from '../models/user.js';
 import glicko2 from 'glicko2';
 
+// Because badminton is life, and ratings are just numbers
 const ranking = new glicko2.Glicko2({ tau: 0.5, rating: 1500, rd: 350, vol: 0.06 });
 
 const selectClosestByRating = (players, basePlayer, sampleSize = 4) => {

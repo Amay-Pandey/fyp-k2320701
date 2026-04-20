@@ -5,11 +5,9 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     age: Number,
     level: String,
-    // Glicko-2 specific fields
     rating: { type: Number, default: 1500 },
     rd: { type: Number, default: 350 },
     vol: { type: Number, default: 0.06 },
-    // Match History for the Dashboard
     matchHistory: [{
         opponent: String,
         teammate: String, // Useful for doubles

@@ -136,7 +136,6 @@ const Dashboard = () => {
                 return;
             }
 
-            // 1. Fetch User Stats
             const userRes = await fetch(`${API_URL}/api/users/me`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -152,7 +151,6 @@ const Dashboard = () => {
                 setErrorMessage('Failed to load profile. Backend might be down.');
             }
 
-            // 2. Fetch Active Session
             const sessionRes = await fetch(`${API_URL}/api/session/active`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -168,7 +166,6 @@ const Dashboard = () => {
                 }
             }
 
-            // 3. Fetch Session History for browsing old sessions
             await fetchSessionHistory();
             await fetchLeaderboard();
         } catch (err) {
@@ -578,6 +575,7 @@ const Dashboard = () => {
                             <div className="profile-card">
                                 <h4>Recent Form</h4>
                                 {userStats.matchHistory.length > 0 ? (
+                                    // Recent form: because who cares about old losses?
                                     userStats.matchHistory.slice().reverse().slice(0, 4).map((m, idx) => {
                                         const diff = Math.round(m.eloAfter - m.eloBefore);
                                         return (

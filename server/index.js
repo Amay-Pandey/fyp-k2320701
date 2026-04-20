@@ -21,8 +21,6 @@ app.use(cors({
 app.use(express.json());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// REGISTER ROUTES
-// These variables must be functions (the routers), which we'll fix in the next step
 app.use('/api/auth', authRoutes);
 app.use('/api/users', apiRoutes);
 app.use('/api/session', apiRoutes);
