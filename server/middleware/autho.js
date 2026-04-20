@@ -1,8 +1,9 @@
 import jwt from 'jsonwebtoken';
 
-
-export default function (req, res, next) {
-    const token = req.header('Authorization')?.split(' ')[1];
+const authMiddleware = (req, res, next) => {
+    // Get token from header
+    const authHeader = req.header('Authorization');
+    const token = authHeader && authHeader.split(' ')[1]; // Extract Bearer <token>
 
     if (!token) {
         return res.status(401).json({ msg: 'No token, authorization denied' });
@@ -15,4 +16,6 @@ export default function (req, res, next) {
     } catch (err) {
         res.status(401).json({ msg: 'Token is not valid' });
     }
-}
+};
+
+export default authMiddleware; // Fixed export for ES Modules

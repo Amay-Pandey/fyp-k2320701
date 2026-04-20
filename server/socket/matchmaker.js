@@ -1,9 +1,9 @@
-const glicko2 = require('glicko2');
-const jwt = require('jsonwebtoken');
-const User = require('../models/user');
-const Session = require('../models/sessions'); // Your new Session model
+import glicko2 from 'glicko2';
+import jwt from 'jsonwebtoken';
+import User from '../models/user.js';
+import Session from '../models/sessions.js'; // Your new Session model
 
-module.exports = (io) => {
+export default (io) => {
     const runMatchmaking = async (sessionId) => {
         // 1. Fetch the specific session from DB
         const session = await Session.findById(sessionId);

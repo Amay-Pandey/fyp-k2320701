@@ -1,10 +1,10 @@
-const Session = require('../models/session');
-const User = require('../models/user');
-const glicko2 = require('glicko2');
+import Session from '../models/sessions.js';
+import User from '../models/user.js';
+import glicko2 from 'glicko2';
 
 const ranking = new glicko2.Glicko2({ tau: 0.5, rating: 1500, rd: 350, vol: 0.06 });
 
-exports.startSession = async (req, res) => {
+export const startSession = async (req, res) => {
     try {
         const { title, numCourts, isDoubles, playerNames } = req.body;
         const nameArray = playerNames.split(',').map(n => n.trim());
@@ -36,7 +36,7 @@ exports.startSession = async (req, res) => {
     }
 };
 
-exports.endMatch = async (req, res) => {
+export const endMatch = async (req, res) => {
     try {
         const { sessionId, matchId, winnerName } = req.body;
         const session = await Session.findById(sessionId);
