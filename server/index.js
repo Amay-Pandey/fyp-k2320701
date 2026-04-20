@@ -4,11 +4,13 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import 'dotenv/config';
-
-// IMPORT ROUTES (Must include .js extension in ES Modules)
+import path from 'path';
+import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import apiRoutes from './routes/api.js';
 import initMatchmaker from './socket/matchmaker.js';
+
+
 
 const app = express();
 
@@ -17,12 +19,20 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
-
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 // REGISTER ROUTES
 // These variables must be functions (the routers), which we'll fix in the next step
 app.use('/api/auth', authRoutes);
 app.use('/api/users', apiRoutes);
 app.use('/api/session', apiRoutes);
+
+const buildPath = path.join(__dirname, '../client/dist');
+app.use(express.static(buildPath));
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
     const [view, setView] = useState('overview'); 
@@ -6,6 +7,8 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [activeSession, setActiveSession] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
+
+    const navigate = useNavigate();
 
     const API_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -18,7 +21,7 @@ const Dashboard = () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) {
-                window.location.href = '/auth';
+                navigate('/auth');
                 return;
             }
 
@@ -61,7 +64,7 @@ const Dashboard = () => {
 
     const handleLogout = () => {
         localStorage.removeItem('token');
-        window.location.href = '/auth';
+        navigate('/auth');
     };
 
     if (loading) return <div style={{ color: 'white', textAlign: 'center', marginTop: '50px' }}>Connecting to CourtSync...</div>;
