@@ -42,7 +42,34 @@ router.get('/active', authMiddleware, async (req, res) => {
     }
 });
 
-// 3. POST /api/session/start
+// 3. GET /api/session/history
+router.get('/history', authMiddleware, async (req, res) => {
+    try {
+        const sessions = await Session.find({ adminId: req.user.id })
+            .sort({ createdAt: -1 })
+            .limit(50);
+        res.json(sessions);
+    } catch (err) {
+        console.error("SESSION HISTORY Error:", err.message);
+        res.status(500).json({ error: "Server error fetching session history" });
+    }
+});
+
+// 4. GET /api/session/:id
+router.get('/:id', authMiddleware, async (req, res) => {
+    try {
+        const session = await Session.findOne({ _id: req.params.id, adminId: req.user.id });
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        res.json(session);
+    } catch (err) {
+        console.error("SESSION FETCH Error:", err.message);
+        res.status(500).json({ error: "Server error fetching session" });
+    }
+});
+
+// 5. POST /api/session/start
 router.post('/start', authMiddleware, startSession);
 
 // 4. POST /api/session/end

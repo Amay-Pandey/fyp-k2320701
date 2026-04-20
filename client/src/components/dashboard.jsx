@@ -6,6 +6,8 @@ const Dashboard = () => {
     const [userStats, setUserStats] = useState({ elo: 1500, username: '', matchHistory: [] });
     const [loading, setLoading] = useState(true);
     const [activeSession, setActiveSession] = useState(null);
+    const [selectedSession, setSelectedSession] = useState(null);
+    const [sessionHistory, setSessionHistory] = useState([]);
     const [errorMessage, setErrorMessage] = useState('');
     const [matchTimer, setMatchTimer] = useState(0);
     const [selectedWinner, setSelectedWinner] = useState({});
@@ -95,11 +97,47 @@ const Dashboard = () => {
                     setView('overview');
                 }
             }
+
+            // 3. Fetch Session History for browsing old sessions
+            await fetchSessionHistory();
         } catch (err) {
             console.error("Dashboard Fetch Error:", err);
             setErrorMessage('Connection lost. Please refresh or check backend logs.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchSessionHistory = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/session/history`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSessionHistory(data || []);
+            }
+        } catch (err) {
+            console.error('Session history fetch error:', err);
+        }
+    };
+
+    const handleSessionSelect = async (sessionId) => {
+        try {
+            const res = await fetch(`${API_URL}/api/session/${sessionId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSelectedSession(data);
+                setView('session-summary');
+            }
+        } catch (err) {
+            console.error('Failed to load session details:', err);
         }
     };
 
@@ -185,6 +223,8 @@ const Dashboard = () => {
         navigate('/auth');
     };
 
+    const sessionToShow = selectedSession || activeSession;
+
     if (loading) return <div style={{ color: 'white', textAlign: 'center', marginTop: '50px' }}>Connecting to CourtSync...</div>;
 
     return (
@@ -226,10 +266,24 @@ const Dashboard = () => {
                 </header>
 
                 <nav>
-                    <button className={view === 'overview' ? 'active' : ''} onClick={() => setView('overview')}>History</button>
-                    <button className={view === 'session-setup' ? 'active' : ''} onClick={() => setView('session-setup')}>New Session</button>
+                    <button className={view === 'overview' ? 'active' : ''} onClick={() => {
+                        setSelectedSession(null);
+                        setView('overview');
+                    }}>Match History</button>
+                    <button className={view === 'session-history' ? 'active' : ''} onClick={() => {
+                        setSelectedSession(null);
+                        fetchSessionHistory();
+                        setView('session-history');
+                    }}>Session History</button>
+                    <button className={view === 'session-setup' ? 'active' : ''} onClick={() => {
+                        setSelectedSession(null);
+                        setView('session-setup');
+                    }}>New Session</button>
                     {activeSession?.isActive && (
-                        <button className={view === 'active-match' ? 'active' : ''} onClick={() => setView('active-match')}>
+                        <button className={view === 'active-match' ? 'active' : ''} onClick={() => {
+                            setSelectedSession(null);
+                            setView('active-match');
+                        }}>
                             Current Match
                         </button>
                     )}
@@ -268,6 +322,44 @@ const Dashboard = () => {
                     </section>
                 )}
 
+                {view === 'session-history' && (
+                    <section>
+                        <h3>Past Sessions</h3>
+                        {sessionHistory.length > 0 ? (
+                            <div style={{ display: 'grid', gap: '14px' }}>
+                                {sessionHistory.map((session) => (
+                                    <div key={session._id} style={{ background: '#181818', padding: '18px', borderRadius: '12px', border: '1px solid #333' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '16px', flexWrap: 'wrap' }}>
+                                            <div>
+                                                <h4 style={{ margin: 0 }}>{session.title || 'Untitled session'}</h4>
+                                                <p style={{ margin: '6px 0 0', color: '#aaa' }}>{new Date(session.createdAt).toLocaleString()}</p>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <p style={{ margin: 0, color: '#888' }}>{session.isActive ? 'Active' : 'Closed'}</p>
+                                                <p style={{ margin: '4px 0 0', color: '#aaa' }}>{session.players.length} players</p>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '12px' }}>
+                                            <span style={{ color: '#ccc' }}>Matches: {session.matches.length}</span>
+                                            <span style={{ color: '#ccc' }}>Finished: {session.matches.filter((m) => m.status === 'finished').length}</span>
+                                            <span style={{ color: '#ccc' }}>Ongoing: {session.matches.filter((m) => m.status === 'ongoing').length}</span>
+                                        </div>
+                                        <button
+                                            className="btn-primary"
+                                            style={{ marginTop: '14px' }}
+                                            onClick={() => handleSessionSelect(session._id)}
+                                        >
+                                            View Summary
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p style={{ color: '#666' }}>No past sessions found yet. Create one to start saving sessions.</p>
+                        )}
+                    </section>
+                )}
+
                 {view === 'session-setup' && (
                     <section>
                         <h3>Start a Session</h3>
@@ -278,19 +370,19 @@ const Dashboard = () => {
                     </section>
                 )}
 
-                {view === 'session-summary' && activeSession && (
+                {view === 'session-summary' && sessionToShow && (
                     <section>
                         <h2 className="text-green">Session Summary</h2>
-                        <p style={{ color: '#aaa' }}>Session: {activeSession.title || 'CourtSync Session'}</p>
+                        <p style={{ color: '#aaa' }}>Session: {sessionToShow.title || 'CourtSync Session'}</p>
                         <div style={{ background: '#1f1f1f', border: '1px solid #333', borderRadius: '12px', padding: '20px', maxWidth: '700px', margin: '20px auto' }}>
-                            <p><strong>Total players:</strong> {activeSession.players.length}</p>
-                            <p><strong>Total matches:</strong> {activeSession.matches.length}</p>
-                            <p><strong>Completed matches:</strong> {activeSession.matches.filter((m) => m.status === 'finished').length}</p>
-                            <p><strong>Ongoing matches:</strong> {activeSession.matches.filter((m) => m.status === 'ongoing').length}</p>
-                            <p><strong>Session status:</strong> {activeSession.isActive ? 'Active' : 'Closed'}</p>
+                            <p><strong>Total players:</strong> {sessionToShow.players.length}</p>
+                            <p><strong>Total matches:</strong> {sessionToShow.matches.length}</p>
+                            <p><strong>Completed matches:</strong> {sessionToShow.matches.filter((m) => m.status === 'finished').length}</p>
+                            <p><strong>Ongoing matches:</strong> {sessionToShow.matches.filter((m) => m.status === 'ongoing').length}</p>
+                            <p><strong>Session status:</strong> {sessionToShow.isActive ? 'Active' : 'Closed'}</p>
                         </div>
                         <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-                            {activeSession.matches.map((match, idx) => (
+                            {sessionToShow.matches.map((match, idx) => (
                                 <div key={idx} style={{ background: '#252525', padding: '18px', borderRadius: '10px', marginBottom: '12px' }}>
                                     <p style={{ fontWeight: '700' }}>Court {match.court}</p>
                                     <p>{match.player1} & {match.player2} {match.player3 ? `vs ${match.player3} & ${match.player4}` : ''}</p>
@@ -302,8 +394,11 @@ const Dashboard = () => {
                                 </div>
                             ))}
                         </div>
-                        <button className="btn-primary" style={{ marginTop: '20px' }} onClick={() => setView('overview')}>
-                            Back to Dashboard
+                        <button className="btn-primary" style={{ marginTop: '20px' }} onClick={() => {
+                            setSelectedSession(null);
+                            setView(selectedSession ? 'session-history' : 'overview');
+                        }}>
+                            {selectedSession ? 'Back to Session History' : 'Back to Dashboard'}
                         </button>
                     </section>
                 )}
