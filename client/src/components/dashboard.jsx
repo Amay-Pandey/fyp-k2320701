@@ -53,6 +53,25 @@ const Dashboard = () => {
     })();
     const streakLabel = currentStreak >= 0 ? `${currentStreak} Wins` : `${-currentStreak} Loss`;
 
+    const leaderboardRows = [
+        {
+            rank: 1,
+            player: userStats.username || 'You',
+            rating: userStats.elo,
+            games: totalGames,
+            wins: totalWins,
+            winRate,
+            achievements: totalGames >= 10 ? ['Top Skill', '10 Games'] : ['Active Player']
+        },
+        { rank: 2, player: 'Marcus Johnson', rating: 1483, games: 14, wins: 10, winRate: 71, achievements: ['Consistent', '10 Games'] },
+        { rank: 3, player: 'Mike Rodriguez', rating: 1459, games: 13, wins: 9, winRate: 69, achievements: ['Hot Streak'] },
+        { rank: 4, player: 'Tom Anderson', rating: 1424, games: 12, wins: 8, winRate: 67, achievements: ['Rising Star'] },
+        { rank: 5, player: 'Emma Watson', rating: 1411, games: 11, wins: 7, winRate: 64, achievements: ['10 Games'] },
+        { rank: 6, player: 'Kevin Lee', rating: 1399, games: 11, wins: 7, winRate: 64, achievements: ['Active'] },
+        { rank: 7, player: 'Rachel Green', rating: 1387, games: 10, wins: 6, winRate: 60, achievements: ['10 Games'] },
+        { rank: 8, player: 'Amy Zhang', rating: 1375, games: 9, wins: 5, winRate: 56, achievements: ['Rising Star'] }
+    ];
+
     const isMatchComplete = (match) => {
         if (!activeSession) return false;
         if (activeSession.isDoubles) {
@@ -370,6 +389,24 @@ const Dashboard = () => {
                 .match-score { margin: 0; color: #bbb; }
                 .match-win { color: #4CAF50; font-weight: 700; }
                 .match-loss { color: #f44336; font-weight: 700; }
+                .leaderboard-table { width: 100%; border-collapse: collapse; min-width: 760px; margin-top: 18px; }
+                .leaderboard-table th { background: linear-gradient(90deg, #4b86ff, #66d4ff); color: #fff; text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.12em; padding: 18px 16px; text-align: left; }
+                .leaderboard-table td { padding: 18px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e6ecff; vertical-align: middle; }
+                .leaderboard-row:nth-child(odd) { background: rgba(255,255,255,0.03); }
+                .player-name { font-weight: 700; color: #fff; }
+                .achievement-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #cdd7ff; font-size: 0.78rem; margin-right: 8px; margin-bottom: 8px; }
+                .overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+                .profile-card { background: #181a20; border: 1px solid #333; border-radius: 18px; padding: 24px; }
+                .profile-card h4 { margin: 0 0 14px; color: #fff; }
+                .profile-line { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #c5d1ff; }
+                .profile-line:last-child { border-bottom: none; }
+                .recent-match { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: 14px; background: #141820; margin-bottom: 12px; }
+                .recent-match:last-child { margin-bottom: 0; }
+                .recent-match strong { color: #fff; }
+                .leaderboard-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+                .summary-pill { background: #11171f; border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 18px; text-align: center; }
+                .summary-pill span { display: block; color: #a7b6ff; font-size: 0.78rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.12em; }
+                .summary-pill strong { font-size: 1.9rem; color: #fff; }
                 table { width: 100%; border-collapse: collapse; margin-top: 15px; }
                 th { text-align: left; color: #666; font-size: 0.8rem; text-transform: uppercase; padding: 12px; border-bottom: 1px solid #333; }
                 td { padding: 15px 12px; border-bottom: 1px solid #2a2a2a; }
@@ -419,6 +456,10 @@ const Dashboard = () => {
                         setSelectedSession(null);
                         setView('leaderboard');
                     }}>Leaderboard</button>
+                    <button className={view === 'match-history' ? 'active' : ''} onClick={() => {
+                        setSelectedSession(null);
+                        setView('match-history');
+                    }}>Match History</button>
                     <button className={view === 'session-history' ? 'active' : ''} onClick={() => {
                         setSelectedSession(null);
                         fetchSessionHistory();
@@ -474,6 +515,101 @@ const Dashboard = () => {
 
                 {view === 'overview' && (
                     <section>
+                        <h3>Performance Overview</h3>
+                        <p style={{ color: '#aaa', marginBottom: '18px' }}>Track your current rating, recent form, and progress without losing sight of your play style.</p>
+                        <div className="overview-grid">
+                            <div className="profile-card">
+                                <h4>Your Profile</h4>
+                                <div className="profile-line"><span>Current Elo</span><strong>{userStats.elo}</strong></div>
+                                <div className="profile-line"><span>Games Played</span><strong>{totalGames}</strong></div>
+                                <div className="profile-line"><span>Wins</span><strong>{totalWins}</strong></div>
+                                <div className="profile-line"><span>Win Rate</span><strong>{winRate}%</strong></div>
+                                <div className="profile-line"><span>Current Streak</span><strong>{streakLabel}</strong></div>
+                            </div>
+                            <div className="profile-card">
+                                <h4>Recent Form</h4>
+                                {userStats.matchHistory.length > 0 ? (
+                                    userStats.matchHistory.slice(0, 4).map((m, idx) => {
+                                        const diff = Math.round(m.eloAfter - m.eloBefore);
+                                        return (
+                                            <div key={idx} className="recent-match">
+                                                <div>
+                                                    <strong>{new Date(m.matchDate).toLocaleDateString()}</strong>
+                                                    <p style={{ margin: '4px 0 0', color: '#9bb4ff' }}>{m.opponent}</p>
+                                                </div>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <span className={m.isWin ? 'text-green' : 'text-red'}>{m.isWin ? 'WIN' : 'LOSS'}</span>
+                                                    <p style={{ margin: '4px 0 0', color: '#ccc' }}>{diff >= 0 ? `+${diff}` : diff}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p style={{ color: '#666' }}>No recent results yet. Start a match to build your form history.</p>
+                                )}
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {view === 'leaderboard' && (
+                    <section>
+                        <h3>Leaderboard</h3>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table className="leaderboard-table">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Player</th>
+                                        <th>Skill Level</th>
+                                        <th>Games</th>
+                                        <th>Wins</th>
+                                        <th>Win Rate</th>
+                                        <th>Achievements</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {leaderboardRows.map((row) => (
+                                        <tr key={row.rank} className="leaderboard-row">
+                                            <td>{row.rank}</td>
+                                            <td className="player-name">{row.player}</td>
+                                            <td>{row.rating}</td>
+                                            <td>{row.games}</td>
+                                            <td>{row.wins}</td>
+                                            <td className={row.winRate >= 65 ? 'text-green' : 'text-red'}>{row.winRate}%</td>
+                                            <td>
+                                                {row.achievements.map((tag, index) => (
+                                                    <span key={index} className="achievement-pill">{tag}</span>
+                                                ))}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="leaderboard-summary">
+                            <div className="summary-pill">
+                                <span>Total Matches</span>
+                                <strong>{totalGames}</strong>
+                            </div>
+                            <div className="summary-pill">
+                                <span>Avg Win Rate</span>
+                                <strong>{winRate}%</strong>
+                            </div>
+                            <div className="summary-pill">
+                                <span>Top Skill</span>
+                                <strong>{userStats.elo}</strong>
+                            </div>
+                            <div className="summary-pill">
+                                <span>Active Players</span>
+                                <strong>{activeSession?.players?.length || 8}</strong>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {view === 'match-history' && (
+                    <section>
                         <h3>Match History</h3>
                         {userStats.matchHistory.length > 0 ? (
                             <table>
@@ -501,33 +637,6 @@ const Dashboard = () => {
                             </table>
                         ) : (
                             <p style={{ color: '#666' }}>No matches recorded yet. Start a session to play!</p>
-                        )}
-                    </section>
-                )}
-
-                {view === 'leaderboard' && (
-                    <section>
-                        <h3>Recent Matches</h3>
-                        {userStats.matchHistory.length > 0 ? (
-                            <div style={{ display: 'grid', gap: '14px' }}>
-                                {userStats.matchHistory.map((match, index) => {
-                                    const diff = Math.round(match.eloAfter - match.eloBefore);
-                                    return (
-                                        <div key={index} className="match-card">
-                                            <div className="match-card-header">
-                                                <span>{new Date(match.matchDate).toLocaleDateString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                                                <span className={match.isWin ? 'match-win' : 'match-loss'}>{match.isWin ? 'WIN' : 'LOSS'}</span>
-                                            </div>
-                                            <div className="match-card-body">
-                                                <p className="match-title">You vs {match.opponent}</p>
-                                                <p className="match-score">Elo change: {diff >= 0 ? `+${diff}` : diff}</p>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <p style={{ color: '#666' }}>No recent matches yet. Play a match to populate your leaderboard.</p>
                         )}
                     </section>
                 )}
