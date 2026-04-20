@@ -27,11 +27,19 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', apiRoutes);
 app.use('/api/session', apiRoutes);
 
-const buildPath = path.join(__dirname, '../client/dist');
+const buildPath = path.resolve(__dirname, '../client/dist');
 app.use(express.static(buildPath));
 
-app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
+app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api')) {
+        return next();
+    }
+    res.sendFile(path.join(buildPath, 'index.html'), (err) => {
+        if (err) {
+            console.error('Error serving index.html:', err);
+            res.status(500).send('Unable to load app');
+        }
+    });
 });
 
 const server = http.createServer(app);
