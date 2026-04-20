@@ -9,7 +9,8 @@ const sessionSchema = new mongoose.Schema({
     players: [{
         username: String,
         isGuest: { type: Boolean, default: false },
-        rating: { type: Number, default: 1500 }
+        rating: { type: Number, default: 1500 },
+        joinedAt: { type: Date, default: Date.now }
     }],
     matches: [{
         player1: String,

@@ -6,12 +6,37 @@ const ranking = new glicko2.Glicko2({ tau: 0.5, rating: 1500, rd: 350, vol: 0.06
 
 const buildMatches = (players, numCourts, isDoubles) => {
     const neededPlayers = isDoubles ? 4 : 2;
-    const sortedPlayers = [...players].sort((a, b) => a.rating - b.rating);
+    const sortedPlayers = [...players].sort((a, b) => {
+        const joinedA = a.joinedAt ? new Date(a.joinedAt).getTime() : 0;
+        const joinedB = b.joinedAt ? new Date(b.joinedAt).getTime() : 0;
+        return joinedA - joinedB || a.rating - b.rating;
+    });
     const matches = [];
     let court = 1;
 
     while (sortedPlayers.length >= neededPlayers && court <= numCourts) {
-        const matchPlayers = sortedPlayers.splice(0, neededPlayers);
+        const matchPlayers = [sortedPlayers.shift()];
+        const remaining = sortedPlayers.splice(0, sortedPlayers.length);
+
+        if (isDoubles) {
+            const secondIndex = remaining.reduce((best, player, index) => {
+                const diff = Math.abs(player.rating - matchPlayers[0].rating);
+                const bestDiff = Math.abs(remaining[best].rating - matchPlayers[0].rating);
+                return diff < bestDiff ? index : best;
+            }, 0);
+            matchPlayers.push(...remaining.splice(secondIndex, 1));
+            matchPlayers.push(...remaining.splice(0, 2));
+        } else {
+            const secondIndex = remaining.reduce((best, player, index) => {
+                const diff = Math.abs(player.rating - matchPlayers[0].rating);
+                const bestDiff = Math.abs(remaining[best].rating - matchPlayers[0].rating);
+                return diff < bestDiff ? index : best;
+            }, 0);
+            matchPlayers.push(...remaining.splice(secondIndex, 1));
+        }
+
+        sortedPlayers.unshift(...remaining);
+
         const match = {
             player1: matchPlayers[0].username,
             player2: matchPlayers[1].username,
@@ -89,12 +114,37 @@ const getFreeCourts = (session) => {
 
 const buildWaitingMatches = (players, freeCourts, isDoubles) => {
     const neededPlayers = isDoubles ? 4 : 2;
-    const sortedPlayers = [...players].sort((a, b) => a.rating - b.rating);
+    const sortedPlayers = [...players].sort((a, b) => {
+        const joinedA = a.joinedAt ? new Date(a.joinedAt).getTime() : 0;
+        const joinedB = b.joinedAt ? new Date(b.joinedAt).getTime() : 0;
+        return joinedA - joinedB || a.rating - b.rating;
+    });
     const newMatches = [];
     let courtIndex = 0;
 
     while (sortedPlayers.length >= neededPlayers && courtIndex < freeCourts.length) {
-        const matchPlayers = sortedPlayers.splice(0, neededPlayers);
+        const matchPlayers = [sortedPlayers.shift()];
+        const remaining = sortedPlayers.splice(0, sortedPlayers.length);
+
+        if (isDoubles) {
+            const secondIndex = remaining.reduce((best, player, index) => {
+                const diff = Math.abs(player.rating - matchPlayers[0].rating);
+                const bestDiff = Math.abs(remaining[best].rating - matchPlayers[0].rating);
+                return diff < bestDiff ? index : best;
+            }, 0);
+            matchPlayers.push(...remaining.splice(secondIndex, 1));
+            matchPlayers.push(...remaining.splice(0, 2));
+        } else {
+            const secondIndex = remaining.reduce((best, player, index) => {
+                const diff = Math.abs(player.rating - matchPlayers[0].rating);
+                const bestDiff = Math.abs(remaining[best].rating - matchPlayers[0].rating);
+                return diff < bestDiff ? index : best;
+            }, 0);
+            matchPlayers.push(...remaining.splice(secondIndex, 1));
+        }
+
+        sortedPlayers.unshift(...remaining);
+
         const match = {
             player1: matchPlayers[0].username,
             player2: matchPlayers[1].username,
@@ -138,7 +188,8 @@ export const startSession = async (req, res) => {
                 isGuest: !user,
                 rating: user ? user.rating : 1500,
                 rd: user ? user.rd : 350,
-                vol: user ? user.vol : 0.06
+                vol: user ? user.vol : 0.06,
+                joinedAt: new Date()
             };
         }));
 

@@ -17,6 +17,19 @@ const Dashboard = () => {
 
     const API_URL = import.meta.env.VITE_BACKEND_URL;
 
+    const waitingQueue = activeSession?.players
+        .filter((player) => !activeSession.matches.some((m) => m.status === 'ongoing' && [m.player1, m.player2, m.player3, m.player4].includes(player.username)))
+        .sort((a, b) => {
+            const aTime = new Date(a.joinedAt || activeSession?.createdAt || Date.now()).getTime();
+            const bTime = new Date(b.joinedAt || activeSession?.createdAt || Date.now()).getTime();
+            return aTime - bTime;
+        }) || [];
+
+    const queueWaitTime = (joinedAt) => {
+        const start = new Date(joinedAt || activeSession?.createdAt || Date.now()).getTime();
+        return formatTimer(Math.floor((Date.now() - start) / 1000));
+    };
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -214,7 +227,7 @@ const Dashboard = () => {
                 <nav>
                     <button className={view === 'overview' ? 'active' : ''} onClick={() => setView('overview')}>History</button>
                     <button className={view === 'session-setup' ? 'active' : ''} onClick={() => setView('session-setup')}>New Session</button>
-                    {activeSession && (
+                    {activeSession?.isActive && (
                         <button className={view === 'active-match' ? 'active' : ''} onClick={() => setView('active-match')}>
                             Current Match
                         </button>
@@ -294,7 +307,7 @@ const Dashboard = () => {
                     </section>
                 )}
 
-                {view === 'active-match' && activeSession && (
+                {view === 'active-match' && activeSession?.isActive && (
                     <section style={{ textAlign: 'center', padding: '40px 0' }}>
                         <h2 className="text-green">Match in Progress</h2>
                         <p style={{ color: '#aaa', marginBottom: '10px' }}>Session: {activeSession.title || 'CourtSync Session'}</p>
@@ -307,6 +320,17 @@ const Dashboard = () => {
                         <div style={{ fontSize: '1.1rem', marginBottom: '20px' }}>
                             <p>Live timer: <strong>{formatTimer(matchTimer)}</strong></p>
                         </div>
+                        {waitingQueue.length > 0 && (
+                            <div style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '16px', margin: '0 auto 20px', maxWidth: '700px' }}>
+                                <h4 style={{ margin: '0 0 10px', color: '#bbb' }}>Waiting Queue</h4>
+                                {waitingQueue.map((player) => (
+                                    <div key={player.username} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #222' }}>
+                                        <span>{player.username}</span>
+                                        <span style={{ color: '#888' }}>Waiting {queueWaitTime(player.joinedAt)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         {activeSession.matches?.filter(m => m.status === 'ongoing').length > 0 ? (
                             activeSession.matches.filter(m => m.status === 'ongoing').map((match, idx) => (
                                 <div key={idx} style={{ background: '#252525', padding: '20px', borderRadius: '10px', marginBottom: '20px', textAlign: 'left' }}>
