@@ -3,18 +3,16 @@ import Auth from './components/auth';
 import Matchmaker from './components/matchmaker';
 
 function App() {
-    // Lean check: do we have a token?
-    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
+  const token = localStorage.getItem('token');
 
-    return (
-        <div>
-            {isLoggedIn ? (
-                <Matchmaker onLogout={() => setIsLoggedIn(false)} />
-            ) : (
-                <Auth onLoginSuccess={() => setIsLoggedIn(true)} />
-            )}
-        </div>
-    );
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={token ? <Dashboard /> : <Navigate to="/auth" />} />
+        <Route path="/auth" element={<Auth />} />
+      </Routes>
+    </Router>
+  );
 }
 
 export default App;

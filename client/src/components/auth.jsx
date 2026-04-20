@@ -48,7 +48,7 @@ const Auth = ({ onLoginSuccess }) => {
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     style={{ display: 'block', width: '100%', marginBottom: '10px' }}
                 />
-                // Inside your Auth.jsx form
+                
                 {!isLogin && (
                     <>
                         <input
