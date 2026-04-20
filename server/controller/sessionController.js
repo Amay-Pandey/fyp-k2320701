@@ -4,6 +4,22 @@ import glicko2 from 'glicko2';
 
 const ranking = new glicko2.Glicko2({ tau: 0.5, rating: 1500, rd: 350, vol: 0.06 });
 
+const selectClosestByRating = (players, basePlayer, sampleSize = 4) => {
+    const pool = players.slice(0, Math.min(sampleSize, players.length));
+    let bestIndex = 0;
+    let bestDiff = Math.abs(pool[0].rating - basePlayer.rating);
+
+    for (let i = 1; i < pool.length; i += 1) {
+        const diff = Math.abs(pool[i].rating - basePlayer.rating);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            bestIndex = i;
+        }
+    }
+
+    return bestIndex;
+};
+
 const buildMatches = (players, numCourts, isDoubles) => {
     const neededPlayers = isDoubles ? 4 : 2;
     const sortedPlayers = [...players].sort((a, b) => {
@@ -16,26 +32,18 @@ const buildMatches = (players, numCourts, isDoubles) => {
 
     while (sortedPlayers.length >= neededPlayers && court <= numCourts) {
         const matchPlayers = [sortedPlayers.shift()];
-        const remaining = sortedPlayers.splice(0, sortedPlayers.length);
+        const remaining = sortedPlayers;
 
         if (isDoubles) {
-            const secondIndex = remaining.reduce((best, player, index) => {
-                const diff = Math.abs(player.rating - matchPlayers[0].rating);
-                const bestDiff = Math.abs(remaining[best].rating - matchPlayers[0].rating);
-                return diff < bestDiff ? index : best;
-            }, 0);
-            matchPlayers.push(...remaining.splice(secondIndex, 1));
+            if (remaining.length < 3) break;
+            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0], 4);
+            matchPlayers.push(...remaining.splice(partnerIndex, 1));
             matchPlayers.push(...remaining.splice(0, 2));
         } else {
-            const secondIndex = remaining.reduce((best, player, index) => {
-                const diff = Math.abs(player.rating - matchPlayers[0].rating);
-                const bestDiff = Math.abs(remaining[best].rating - matchPlayers[0].rating);
-                return diff < bestDiff ? index : best;
-            }, 0);
-            matchPlayers.push(...remaining.splice(secondIndex, 1));
+            if (remaining.length < 1) break;
+            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0], 4);
+            matchPlayers.push(...remaining.splice(partnerIndex, 1));
         }
-
-        sortedPlayers.unshift(...remaining);
 
         const match = {
             player1: matchPlayers[0].username,
@@ -124,26 +132,18 @@ const buildWaitingMatches = (players, freeCourts, isDoubles) => {
 
     while (sortedPlayers.length >= neededPlayers && courtIndex < freeCourts.length) {
         const matchPlayers = [sortedPlayers.shift()];
-        const remaining = sortedPlayers.splice(0, sortedPlayers.length);
+        const remaining = sortedPlayers;
 
         if (isDoubles) {
-            const secondIndex = remaining.reduce((best, player, index) => {
-                const diff = Math.abs(player.rating - matchPlayers[0].rating);
-                const bestDiff = Math.abs(remaining[best].rating - matchPlayers[0].rating);
-                return diff < bestDiff ? index : best;
-            }, 0);
-            matchPlayers.push(...remaining.splice(secondIndex, 1));
+            if (remaining.length < 3) break;
+            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0], 4);
+            matchPlayers.push(...remaining.splice(partnerIndex, 1));
             matchPlayers.push(...remaining.splice(0, 2));
         } else {
-            const secondIndex = remaining.reduce((best, player, index) => {
-                const diff = Math.abs(player.rating - matchPlayers[0].rating);
-                const bestDiff = Math.abs(remaining[best].rating - matchPlayers[0].rating);
-                return diff < bestDiff ? index : best;
-            }, 0);
-            matchPlayers.push(...remaining.splice(secondIndex, 1));
+            if (remaining.length < 1) break;
+            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0], 4);
+            matchPlayers.push(...remaining.splice(partnerIndex, 1));
         }
-
-        sortedPlayers.unshift(...remaining);
 
         const match = {
             player1: matchPlayers[0].username,
@@ -316,7 +316,8 @@ export const endMatch = async (req, res) => {
         }
 
         const hasOngoing = session.matches.some((m) => m.status === 'ongoing');
-        session.isActive = hasOngoing;
+        const hasWaitingPlayers = waitingPlayers.length > 0;
+        session.isActive = hasOngoing || hasWaitingPlayers;
 
         await session.save();
 

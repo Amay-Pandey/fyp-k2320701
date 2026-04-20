@@ -92,6 +92,7 @@ const Dashboard = () => {
                     setView(sessionData.isActive ? 'active-match' : 'session-summary');
                 } else {
                     setActiveSession(null);
+                    setView('overview');
                 }
             }
         } catch (err) {

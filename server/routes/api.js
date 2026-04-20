@@ -27,9 +27,15 @@ router.get('/me', authMiddleware, async (req, res) => {
 // 2. GET /api/session/active
 router.get('/active', authMiddleware, async (req, res) => {
     try {
-        const activeSession = await Session.findOne({ adminId: req.user.id, isActive: true })
+        let session = await Session.findOne({ adminId: req.user.id, isActive: true })
             .sort({ createdAt: -1 });
-        res.json(activeSession || null);
+
+        if (!session) {
+            session = await Session.findOne({ adminId: req.user.id })
+                .sort({ createdAt: -1 });
+        }
+
+        res.json(session || null);
     } catch (err) {
         console.error("ACTIVE SESSION Error:", err.message);
         res.status(500).json({ error: "Server error fetching active session" });
