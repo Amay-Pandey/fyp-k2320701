@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Auth = ({ onLoginSuccess }) => {
+    const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [error, setError] = useState('');
@@ -23,7 +25,8 @@ const Auth = ({ onLoginSuccess }) => {
             if (isLogin) {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);
-                onLoginSuccess();
+                if (onLoginSuccess) onLoginSuccess();
+                navigate('/');
             } else {
                 alert("Account created! Please login.");
                 setIsLogin(true);
