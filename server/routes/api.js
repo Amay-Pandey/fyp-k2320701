@@ -1,22 +1,22 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const User = require('../models/user');
-import authMiddleware from '../middleware/autho.js';
+import User from '../models/user.js';
+import authMiddleware from '../middleware/autho.js'; // Ensure the .js extension
 
-// GET /api/users/me
 router.get('/me', authMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
+        if (!user) return res.status(404).json({ msg: "User not found" });
         res.json(user);
     } catch (err) {
-        res.status(500).json({ error: "Server Error" });
+        res.status(500).send('Server Error');
     }
 });
 
-// POST /api/session/start
-router.post('/start', authMiddleware, async (req, res) => {
-   // your session start logic here
-   res.json({ message: "Session started" });
+// Add your session start route here too
+router.post('/session/start', authMiddleware, async (req, res) => {
+    // Logic for starting session
+    res.json({ msg: "Session started" });
 });
 
-module.exports = router;
+export default router;
