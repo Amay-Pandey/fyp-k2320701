@@ -1,14 +1,15 @@
 import express from 'express';
 import http from 'http';
-import { Server } from 'socket.io';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import 'dotenv/config';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import authRoutes from './routes/auth.js';
-import apiRoutes from './routes/api.js';
-import initMatchmaker from './socket/matchmaker.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import authRoutes from './modules/auth/auth.routes.js';
+import apiRoutes from './modules/sessions/session.routes.js';
+import dns from 'node:dns';
+
+// Force Node.js to use Google DNS
 
 
 
@@ -40,16 +41,18 @@ app.use((req, res, next) => {
     });
 });
 
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "https://courtsync-ebsd.onrender.com", methods: ["GET", "POST"] } 
-});
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
-mongoose.connect(process.env.MONGO_DB_URI)
+
+const server = http.createServer(app);
+const mongoUri = process.env.MONGO_DB_URI;
+if (!mongoUri) {
+    throw new Error('MONGO_DB_URI is not configured');
+}
+
+mongoose.connect(mongoUri)
     .then(() => console.log('✅ MongoDB Connected'))
     .catch(err => console.error('❌ DB Error:', err));
-
-initMatchmaker(io);
 
 const PORT = process.env.PORT || 3002;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

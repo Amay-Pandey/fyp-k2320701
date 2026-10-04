@@ -1,26 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { LeaderboardRow, MatchHistoryEntry, MatchScore, PlayerField, SessionData, SessionMatch, UserStats, WinnerTeam } from '../../types/domain';
+
+type DashboardView = 'overview' | 'active-match' | 'session-summary' | 'leaderboard' | 'settings' | 'match-history' | 'session-history' | 'create-session';
+
+interface UserProfileResponse {
+    username: string;
+    rating?: number;
+    matchHistory?: MatchHistoryEntry[];
+}
+
+interface SessionResponse {
+    session: SessionData;
+    message?: string;
+    error?: string;
+}
+
+interface ErrorResponse {
+    error?: string;
+}
+
+const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : 'An unexpected error occurred';
+
+const readJson = async <T,>(response: Response): Promise<T> => response.json() as Promise<T>;
 
 const Dashboard = () => {
-    const [view, setView] = useState('overview'); 
-    const [userStats, setUserStats] = useState({ elo: 1500, username: '', matchHistory: [] });
+    const [view, setView] = useState<DashboardView>('overview');
+    const [userStats, setUserStats] = useState<UserStats>({ elo: 1500, username: '', matchHistory: [] });
     const [loading, setLoading] = useState(true);
-    const [leaderboardRows, setLeaderboardRows] = useState([]);
+    const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardRow[]>([]);
     const [leaderboardLoading, setLeaderboardLoading] = useState(false);
     const [leaderboardError, setLeaderboardError] = useState('');
     const [dyslexiaMode, setDyslexiaMode] = useState(false);
     const [fontSizePercent, setFontSizePercent] = useState(110);
     const dashboardClass = dyslexiaMode ? 'dashboard-container dyslexia-mode' : 'dashboard-container';
-    const [activeSession, setActiveSession] = useState(null);
-    const [selectedSession, setSelectedSession] = useState(null);
-    const [sessionHistory, setSessionHistory] = useState([]);
+    const [activeSession, setActiveSession] = useState<SessionData | null>(null);
+    const [selectedSession, setSelectedSession] = useState<SessionData | null>(null);
+    const [sessionHistory, setSessionHistory] = useState<SessionData[]>([]);
     const [errorMessage, setErrorMessage] = useState('');
     const [matchTimer, setMatchTimer] = useState(0);
-    const [selectedWinner, setSelectedWinner] = useState({});
-    const [matchScores, setMatchScores] = useState({});
+    const [selectedWinner, setSelectedWinner] = useState<Record<string, string>>({});
+    const [matchScores, setMatchScores] = useState<Record<string, Partial<MatchScore>>>({});
     const [newPlayerName, setNewPlayerName] = useState('');
-    const [replacementSelection, setReplacementSelection] = useState({});
-    const [endingMatchId, setEndingMatchId] = useState(null);
+    const [replacementSelection, setReplacementSelection] = useState<Record<string, string>>({});
+    const [endingMatchId, setEndingMatchId] = useState<string | null>(null);
     const [matchActionError, setMatchActionError] = useState('');
 
     const navigate = useNavigate();
@@ -35,7 +58,7 @@ const Dashboard = () => {
             return aTime - bTime;
         }) || [];
 
-    const queueWaitTime = (joinedAt) => {
+    const queueWaitTime = (joinedAt?: string | Date) => {
         const start = new Date(joinedAt || activeSession?.createdAt || Date.now()).getTime();
         return formatTimer(Math.floor((Date.now() - start) / 1000));
     };
@@ -59,7 +82,7 @@ const Dashboard = () => {
     })();
     const streakLabel = currentStreak >= 0 ? `${currentStreak} Wins` : `${-currentStreak} Loss`;
 
-    const isMatchComplete = (match) => {
+    const isMatchComplete = (match: SessionMatch) => {
         if (!activeSession) return false;
         if (activeSession.isDoubles) {
             return Boolean(match.player1 && match.player2 && match.player3 && match.player4);
@@ -77,11 +100,11 @@ const Dashboard = () => {
             });
 
             if (!res.ok) {
-                const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to load leaderboard');
+                const errorData = await readJson<ErrorResponse>(res).catch((): ErrorResponse => ({}));
+                throw new Error(errorData.error ?? 'Failed to load leaderboard');
             }
 
-            const data = await res.json();
+            const data = await readJson<LeaderboardRow[]>(res);
             setLeaderboardRows(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error('Leaderboard fetch error:', err);
@@ -121,7 +144,7 @@ const Dashboard = () => {
         return () => clearInterval(interval);
     }, [activeSession]);
 
-    const formatTimer = (seconds) => {
+    const formatTimer = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -141,7 +164,7 @@ const Dashboard = () => {
             });
 
             if (userRes.ok) {
-                const userData = await userRes.json();
+                const userData = await readJson<UserProfileResponse>(userRes);
                 setUserStats({
                     elo: userData.rating || 1500,
                     username: userData.username || 'User',
@@ -156,7 +179,7 @@ const Dashboard = () => {
             });
 
             if (sessionRes.ok) {
-                const sessionData = await sessionRes.json();
+                const sessionData = await readJson<SessionData | null>(sessionRes);
                 if (sessionData) {
                     setActiveSession(sessionData);
                     setView(sessionData.isActive ? 'active-match' : 'session-summary');
@@ -184,7 +207,7 @@ const Dashboard = () => {
                 }
             });
             if (res.ok) {
-                const data = await res.json();
+                const data = await readJson<SessionData[]>(res);
                 setSessionHistory(data || []);
             }
         } catch (err) {
@@ -192,7 +215,7 @@ const Dashboard = () => {
         }
     };
 
-    const handleSessionSelect = async (sessionId) => {
+    const handleSessionSelect = async (sessionId: string) => {
         try {
             const res = await fetch(`${API_URL}/api/session/${sessionId}`, {
                 headers: {
@@ -200,7 +223,7 @@ const Dashboard = () => {
                 }
             });
             if (res.ok) {
-                const data = await res.json();
+                const data = await readJson<SessionData>(res);
                 setSelectedSession(data);
                 setView('session-summary');
             }
@@ -209,7 +232,8 @@ const Dashboard = () => {
         }
     };
 
-    const handleEndMatch = async (match) => {
+    const handleEndMatch = async (match: SessionMatch) => {
+        if (!activeSession) return;
         setMatchActionError('');
         const winner = selectedWinner[match.matchId];
 
@@ -220,14 +244,24 @@ const Dashboard = () => {
 
         setEndingMatchId(match.matchId);
         try {
-            const currentScore = matchScores[match.matchId] || {};
-            const payload = {
+            const currentScore = matchScores[match.matchId] ?? {};
+            const payload: {
+                sessionId: string;
+                matchId: string;
+                score: Partial<MatchScore>;
+                winnerTeam?: WinnerTeam;
+                winnerName?: string;
+            } = {
                 sessionId: activeSession._id,
                 matchId: match.matchId,
                 score: currentScore
             };
 
             if (match.player3 && match.player4) {
+                if (winner !== 'team1' && winner !== 'team2') {
+                    setMatchActionError('Select a valid winning team.');
+                    return;
+                }
                 payload.winnerTeam = winner;
             } else {
                 payload.winnerName = winner;
@@ -242,18 +276,19 @@ const Dashboard = () => {
                 body: JSON.stringify(payload)
             });
 
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to end match');
+            const data = await readJson<SessionResponse & ErrorResponse>(res);
+            if (!res.ok) throw new Error(data.error ?? 'Failed to end match');
             setActiveSession(data.session);
             setView(data.session.isActive ? 'active-match' : 'session-summary');
         } catch (err) {
-            setMatchActionError(err.message);
+            setMatchActionError(getErrorMessage(err));
         } finally {
             setEndingMatchId(null);
         }
     };
 
     const handleEndSession = async () => {
+        if (!activeSession) return;
         setMatchActionError('');
         setEndingMatchId('session');
         try {
@@ -265,18 +300,19 @@ const Dashboard = () => {
                 },
                 body: JSON.stringify({ sessionId: activeSession._id })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to end session');
+            const data = await readJson<SessionResponse & ErrorResponse>(res);
+            if (!res.ok) throw new Error(data.error ?? 'Failed to end session');
             setActiveSession(data.session);
             setView('session-summary');
         } catch (err) {
-            setMatchActionError(err.message);
+            setMatchActionError(getErrorMessage(err));
         } finally {
             setEndingMatchId(null);
         }
     };
 
     const handleAddPlayer = async () => {
+        if (!activeSession) return;
         if (!newPlayerName.trim()) {
             setMatchActionError('Enter a name to add a player.');
             return;
@@ -292,16 +328,17 @@ const Dashboard = () => {
                 },
                 body: JSON.stringify({ sessionId: activeSession._id, username: newPlayerName.trim() })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to add player');
+            const data = await readJson<SessionResponse & ErrorResponse>(res);
+            if (!res.ok) throw new Error(data.error ?? 'Failed to add player');
             setActiveSession(data.session);
             setNewPlayerName('');
         } catch (err) {
-            setMatchActionError(err.message);
+            setMatchActionError(getErrorMessage(err));
         }
     };
 
-    const handleRemoveQueuePlayer = async (username) => {
+    const handleRemoveQueuePlayer = async (username: string) => {
+        if (!activeSession) return;
         setMatchActionError('');
         try {
             const res = await fetch(`${API_URL}/api/session/player/remove`, {
@@ -312,15 +349,16 @@ const Dashboard = () => {
                 },
                 body: JSON.stringify({ sessionId: activeSession._id, username })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to remove player');
+            const data = await readJson<SessionResponse & ErrorResponse>(res);
+            if (!res.ok) throw new Error(data.error ?? 'Failed to remove player');
             setActiveSession(data.session);
         } catch (err) {
-            setMatchActionError(err.message);
+            setMatchActionError(getErrorMessage(err));
         }
     };
 
-    const handleReplacePlayer = async (match, field) => {
+    const handleReplacePlayer = async (match: SessionMatch, field: PlayerField) => {
+        if (!activeSession) return;
         const key = `${match.matchId}-${field}`;
         const replacementUsername = replacementSelection[key];
 
@@ -344,16 +382,16 @@ const Dashboard = () => {
                     replacementUsername
                 })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to replace player');
+            const data = await readJson<SessionResponse & ErrorResponse>(res);
+            if (!res.ok) throw new Error(data.error ?? 'Failed to replace player');
             setActiveSession(data.session);
             setReplacementSelection((prev) => ({ ...prev, [key]: '' }));
         } catch (err) {
-            setMatchActionError(err.message);
+            setMatchActionError(getErrorMessage(err));
         }
     };
 
-    const handleScoreChange = (matchId, field, value) => {
+    const handleScoreChange = (matchId: string, field: keyof MatchScore, value: string) => {
         setMatchScores((prev) => ({
             ...prev,
             [matchId]: {
@@ -709,7 +747,7 @@ const Dashboard = () => {
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '16px', flexWrap: 'wrap' }}>
                                             <div>
                                                 <h4 style={{ margin: 0 }}>{session.title || 'Untitled session'}</h4>
-                                                <p style={{ margin: '6px 0 0', color: '#aaa' }}>{new Date(session.createdAt).toLocaleString()}</p>
+                                                <p style={{ margin: '6px 0 0', color: '#aaa' }}>{new Date(session.createdAt ?? Date.now()).toLocaleString()}</p>
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
                                                 <p style={{ margin: 0, color: '#888' }}>{session.isActive ? 'Active' : 'Closed'}</p>
@@ -954,7 +992,7 @@ const Dashboard = () => {
                                         {waitingQueue.length > 0 && (
                                             <div style={{ display: 'grid', gap: '8px' }}>
                                                 <label style={{ color: '#aaa' }}>Replace a player from this match</label>
-                                                {(activeSession.isDoubles ? ['player1', 'player2', 'player3', 'player4'] : ['player1', 'player2']).map((field) => {
+                                                {(activeSession.isDoubles ? ['player1', 'player2', 'player3', 'player4'] as PlayerField[] : ['player1', 'player2'] as PlayerField[]).map((field) => {
                                                     const currentName = match[field] || 'Vacant spot';
                                                     const key = `${match.matchId}-${field}`;
                                                     return (
@@ -981,7 +1019,10 @@ const Dashboard = () => {
                                                                 <button
                                                                     className="btn-primary"
                                                                     style={{ padding: '10px 16px', background: '#c62828', borderColor: '#a82424' }}
-                                                                    onClick={() => handleRemoveQueuePlayer(match[field])}
+                                                                    onClick={() => {
+                                                                        const playerName = match[field];
+                                                                        if (playerName) handleRemoveQueuePlayer(playerName);
+                                                                    }}
                                                                 >
                                                                     Remove
                                                                 </button>
@@ -1037,7 +1078,12 @@ const Dashboard = () => {
     );
 };
 
-const SessionSetupForm = ({ onStart, API_URL }) => {
+interface SessionSetupFormProps {
+    onStart: () => void;
+    API_URL: string;
+}
+
+const SessionSetupForm = ({ onStart, API_URL }: SessionSetupFormProps) => {
     const [formData, setFormData] = useState({
         title: '',
         numCourts: 1,
@@ -1046,7 +1092,7 @@ const SessionSetupForm = ({ onStart, API_URL }) => {
     });
     const [submitting, setSubmitting] = useState(false);
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setSubmitting(true);
         try {
@@ -1062,8 +1108,8 @@ const SessionSetupForm = ({ onStart, API_URL }) => {
             if (res.ok) {
                 onStart();
             } else {
-                const errorData = await res.json();
-                alert(`Error: ${errorData.error || "Could not start session"}`);
+                const errorData = await readJson<ErrorResponse>(res);
+                alert(`Error: ${errorData.error ?? "Could not start session"}`);
             }
         } catch (err) {
             alert("Connection error. Check if backend is running.");

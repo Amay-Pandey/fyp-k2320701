@@ -1,13 +1,32 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const Auth = ({ onLoginSuccess }) => {
+interface AuthFormData {
+    username: string;
+    password: string;
+    age?: string;
+    level?: string;
+}
+
+interface AuthResponse {
+    token?: string;
+    username?: string;
+    error?: string;
+}
+
+interface AuthProps {
+    onLoginSuccess?: () => void;
+}
+
+const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Something went wrong';
+
+const Auth = ({ onLoginSuccess }: AuthProps) => {
     const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
-    const [formData, setFormData] = useState({ username: '', password: '' });
+    const [formData, setFormData] = useState<AuthFormData>({ username: '', password: '' });
     const [error, setError] = useState('');
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
         const url = `${import.meta.env.VITE_BACKEND_URL}${endpoint}`;
@@ -25,11 +44,12 @@ const Auth = ({ onLoginSuccess }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const data = await res.json();
+            const data = await res.json() as AuthResponse;
 
-            if (!res.ok) throw new Error(data.error || 'Something went wrong');
+            if (!res.ok) throw new Error(data.error ?? 'Something went wrong');
 
             if (isLogin) {
+                if (!data.token || !data.username) throw new Error('Invalid login response');
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);
                 if (onLoginSuccess) onLoginSuccess();
@@ -40,7 +60,7 @@ const Auth = ({ onLoginSuccess }) => {
                 setFormData({ username: '', password: '', age: '', level: 'Beginner' });
             }
         } catch (err) {
-            setError(err.message);
+            setError(getErrorMessage(err));
         }
     };
 

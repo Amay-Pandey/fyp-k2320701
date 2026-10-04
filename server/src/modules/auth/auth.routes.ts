@@ -1,16 +1,37 @@
 import express from 'express';
-const router = express.Router();
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User from '../models/user.js';
+import bcrypt from 'bcryptjs';
+import type { RequestHandler } from 'express';
+import User from '../users/user.model.js';
+
+interface RegisterRequest {
+    username: string;
+    password: string;
+    age?: string | number;
+    level?: string;
+}
+
+interface LoginRequest {
+    username: string;
+    password: string;
+}
+
+interface AuthResponse {
+    message?: string;
+    error?: string;
+    token?: string;
+    username?: string;
+}
+
+const router = express.Router();
 
 // Register
-router.post('/register', async (req, res) => {
+const register: RequestHandler<Record<string, never>, AuthResponse, RegisterRequest> = async (req, res) => {
     try {
         const { username, password, age, level } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const levelRatingMap = {
+        const levelRatingMap: Record<string, number> = {
             'Beginner': 600,
             'Weekly casual': 800,
             'Tier 1/2/3 BE': 2000,
@@ -20,7 +41,7 @@ router.post('/register', async (req, res) => {
             'Badminton England rated': 1700
         };
 
-        const initialRating = levelRatingMap[level] || 1500;
+        const initialRating = levelRatingMap[level ?? ''] ?? 1500;
 
         const user = new User({
             username,
@@ -36,15 +57,22 @@ router.post('/register', async (req, res) => {
     } catch (e) {
         res.status(400).json({ error: "Username already exists" });
     }
-});
+};
+
+router.post('/register', register);
 
 // Login
-router.post('/login', async (req, res) => {
+const login: RequestHandler<Record<string, never>, AuthResponse, LoginRequest> = async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username });
         if (user && await bcrypt.compare(password, user.password)) {
-            const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET);
+            const secret = process.env.JWT_SECRET;
+            if (!secret) {
+                res.status(500).json({ error: 'JWT secret is not configured' });
+                return;
+            }
+            const token = jwt.sign({ id: user._id.toString(), username: user.username }, secret);
             res.json({ token, username: user.username });
         } else {
             res.status(401).json({ error: "Invalid credentials" });
@@ -52,6 +80,8 @@ router.post('/login', async (req, res) => {
     } catch (e) {
         res.status(500).json({ error: "Server error" });
     }
-});
+};
+
+router.post('/login', login);
 
 export default router;

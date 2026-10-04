@@ -1,9 +1,11 @@
 import express from 'express';
 const router = express.Router();
-import User from '../models/user.js';
-import Session from '../models/sessions.js'; 
-import authMiddleware from '../middleware/autho.js';
-import { startSession, endMatch, endSession, addPlayerToSession, removePlayerFromSession, replaceMatchPlayer } from '../controller/sessionController.js';
+import User from '../users/user.model.js';
+import Session from './session.model.js';
+import authMiddleware from '../auth/auth.middleware.js';
+import { startSession, endMatch, endSession, addPlayerToSession, removePlayerFromSession, replaceMatchPlayer } from './session.controller.js';
+
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unknown error';
 
 router.get('/me', authMiddleware, async (req, res) => {
     try {
@@ -16,7 +18,7 @@ router.get('/me', authMiddleware, async (req, res) => {
         
         res.json(user);
     } catch (err) {
-        console.error("ME Error:", err.message);
+        console.error("ME Error:", errorMessage(err));
         res.status(500).json({ error: "Server failed to fetch user profile" });
     }
 });
@@ -33,7 +35,7 @@ router.get('/active', authMiddleware, async (req, res) => {
 
         res.json(session || null);
     } catch (err) {
-        console.error("ACTIVE SESSION Error:", err.message);
+        console.error("ACTIVE SESSION Error:", errorMessage(err));
         res.status(500).json({ error: "Server error fetching active session" });
     }
 });
@@ -45,7 +47,7 @@ router.get('/history', authMiddleware, async (req, res) => {
             .limit(50);
         res.json(sessions);
     } catch (err) {
-        console.error("SESSION HISTORY Error:", err.message);
+        console.error("SESSION HISTORY Error:", errorMessage(err));
         res.status(500).json({ error: "Server error fetching session history" });
     }
 });
@@ -65,8 +67,8 @@ router.get('/leaderboard', authMiddleware, async (req, res) => {
             ]
         }).lean();
 
-        const sharedUsernames = new Set();
-        const adminIds = new Set();
+        const sharedUsernames = new Set<string>();
+        const adminIds = new Set<string>();
 
         sessions.forEach((session) => {
             session.players.forEach((player) => {
@@ -89,8 +91,8 @@ router.get('/leaderboard', authMiddleware, async (req, res) => {
             .select('username rating matchHistory')
             .lean();
 
-        const buildAchievements = (games, winRate) => {
-            const tags = [];
+        const buildAchievements = (games: number, winRate: number): string[] => {
+            const tags: string[] = [];
             if (games >= 10) tags.push('10 Games');
             if (winRate >= 75) tags.push('Hot Streak');
             else if (winRate >= 60) tags.push('Consistent');
@@ -130,7 +132,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
         }
         res.json(session);
     } catch (err) {
-        console.error("SESSION FETCH Error:", err.message);
+        console.error("SESSION FETCH Error:", errorMessage(err));
         res.status(500).json({ error: "Server error fetching session" });
     }
 });

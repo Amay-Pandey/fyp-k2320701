@@ -2,10 +2,11 @@
   "name": "server",
   "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
     "test": "exit 0"
   },
   "keywords": [],
@@ -19,12 +20,12 @@
     "express": "^5.2.1",
     "glicko2": "^1.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongodb": "^7.1.1",
-    "mongoose": "^9.4.1",
-    "moongoose": "^0.0.1",
-    "socket.io": "^4.8.3"
+    "mongoose": "^9.4.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "tsx": "^4.19.4"
   }
 }

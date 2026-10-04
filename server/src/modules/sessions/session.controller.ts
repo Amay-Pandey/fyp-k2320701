@@ -1,10 +1,64 @@
-import Session from '../models/sessions.js';
-import User from '../models/user.js';
+import mongoose from 'mongoose';
+import type { ParamsDictionary, RequestHandler } from 'express-serve-static-core';
+import Session, { type SessionDocument, type SessionMatch, type SessionPlayer, type MatchScore, type PlayerField } from './session.model.js';
+import User, { type UserDocument } from '../users/user.model.js';
 import glicko2 from 'glicko2';
 
+interface StartSessionBody {
+    title: string;
+    numCourts: number;
+    isDoubles: boolean;
+    playerNames: string;
+}
+
+interface EndMatchBody {
+    sessionId: string;
+    matchId: string;
+    winnerName?: string;
+    winnerTeam?: 'team1' | 'team2';
+    score?: Partial<MatchScore>;
+}
+
+interface SessionPlayerBody {
+    sessionId: string;
+    username: string;
+}
+
+interface ReplacePlayerBody {
+    sessionId: string;
+    matchId: string;
+    field: PlayerField;
+    replacementUsername: string;
+}
+
+interface EndSessionBody {
+    sessionId: string;
+}
+
+interface RatingPlayer {
+    username: string;
+    user: UserDocument | null;
+    session: SessionDocument;
+    rating: number;
+    rd: number;
+    vol: number;
+    isWinner: boolean;
+    newRd?: number;
+    newVol?: number;
+}
+
+interface RatingStats {
+    rating: number;
+    rd: number;
+    vol: number;
+}
+
+const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unknown error';
+
+// Because badminton is life, and ratings are just numbers
 const ranking = new glicko2.Glicko2({ tau: 0.5, rating: 1500, rd: 350, vol: 0.06 });
 
-const selectClosestByRating = (players, basePlayer, sampleSize = 4) => {
+const selectClosestByRating = (players: SessionPlayer[], basePlayer: SessionPlayer, sampleSize = 4): number => {
     const pool = players.slice(0, Math.min(sampleSize, players.length));
     let bestIndex = 0;
     let bestDiff = Math.abs(pool[0].rating - basePlayer.rating);
@@ -20,7 +74,7 @@ const selectClosestByRating = (players, basePlayer, sampleSize = 4) => {
     return bestIndex;
 };
 
-const buildMatches = (players, numCourts, isDoubles) => {
+const buildMatches = (players: SessionPlayer[], numCourts: number, isDoubles: boolean): SessionMatch[] => {
     const neededPlayers = isDoubles ? 4 : 2;
     const sortedPlayers = [...players].sort((a, b) => {
         const joinedA = a.joinedAt ? new Date(a.joinedAt).getTime() : 0;
@@ -31,23 +85,25 @@ const buildMatches = (players, numCourts, isDoubles) => {
     let court = 1;
 
     while (sortedPlayers.length >= neededPlayers && court <= numCourts) {
-        const matchPlayers = [sortedPlayers.shift()];
+        const firstPlayer = sortedPlayers.shift();
+        if (!firstPlayer) break;
+        const matchPlayers = [firstPlayer];
         const remaining = sortedPlayers;
 
         if (isDoubles) {
             if (remaining.length < 3) break;
-            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0], 4);
+            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0]!, 4);
             matchPlayers.push(...remaining.splice(partnerIndex, 1));
             matchPlayers.push(...remaining.splice(0, 2));
         } else {
             if (remaining.length < 1) break;
-            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0], 4);
+            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0]!, 4);
             matchPlayers.push(...remaining.splice(partnerIndex, 1));
         }
 
-        const match = {
-            player1: matchPlayers[0].username,
-            player2: matchPlayers[1].username,
+        const match: SessionMatch = {
+            player1: matchPlayers[0]!.username,
+            player2: matchPlayers[1]!.username,
             court,
             status: 'ongoing',
             startTime: new Date(),
@@ -59,8 +115,8 @@ const buildMatches = (players, numCourts, isDoubles) => {
         };
 
         if (isDoubles) {
-            match.player3 = matchPlayers[2].username;
-            match.player4 = matchPlayers[3].username;
+            match.player3 = matchPlayers[2]!.username;
+            match.player4 = matchPlayers[3]!.username;
         }
 
         matches.push(match);
@@ -70,9 +126,9 @@ const buildMatches = (players, numCourts, isDoubles) => {
     return matches;
 };
 
-const findSessionPlayer = (session, username) => session.players.find((player) => player.username === username);
+const findSessionPlayer = (session: SessionDocument, username: string): SessionPlayer | undefined => session.players.find((player) => player.username === username);
 
-const createPlayerObject = async (name) => {
+const createPlayerObject = async (name: string): Promise<SessionPlayer> => {
     const user = await User.findOne({ username: name });
     return {
         username: name,
@@ -84,14 +140,12 @@ const createPlayerObject = async (name) => {
     };
 };
 
-const getQueuePlayers = (session) => {
+const getQueuePlayers = (session: SessionDocument): SessionPlayer[] => {
     const ongoing = getOngoingPlayers(session);
     return session.players.filter((player) => !ongoing.includes(player.username));
 };
 
-const findMatchField = (match, username) => ['player1', 'player2', 'player3', 'player4'].find((field) => match[field] === username);
-
-const getTeamStats = (players) => {
+const getTeamStats = (players: RatingPlayer[]): RatingStats => {
     const count = players.length;
     return {
         rating: players.reduce((sum, p) => sum + p.rating, 0) / count,
@@ -100,9 +154,9 @@ const getTeamStats = (players) => {
     };
 };
 
-const applyRatingDelta = async (playerRecord, delta, opponentNames, match) => {
-    const isGuest = !playerRecord.user;
-    const destination = playerRecord.user || findSessionPlayer(playerRecord.session, playerRecord.username);
+const applyRatingDelta = async (playerRecord: RatingPlayer, delta: number, opponentNames: string[]): Promise<void> => {
+    const sessionPlayer = findSessionPlayer(playerRecord.session, playerRecord.username);
+    const destination = playerRecord.user ?? sessionPlayer;
 
     if (!destination) return;
 
@@ -110,36 +164,36 @@ const applyRatingDelta = async (playerRecord, delta, opponentNames, match) => {
     const newRating = Math.round(beforeRating + delta);
 
     if (playerRecord.user) {
-        destination.matchHistory.push({
+        playerRecord.user.matchHistory.push({
             opponent: opponentNames.join(' & '),
             isWin: playerRecord.isWinner,
             eloBefore: beforeRating,
             eloAfter: newRating,
             matchDate: new Date()
         });
+        playerRecord.user.rating = newRating;
+        playerRecord.user.rd = playerRecord.newRd ?? playerRecord.rd;
+        playerRecord.user.vol = playerRecord.newVol ?? playerRecord.vol;
+        await playerRecord.user.save();
+    } else if (sessionPlayer) {
         destination.rating = newRating;
-        destination.rd = playerRecord.newRd;
-        destination.vol = playerRecord.newVol;
-        await destination.save();
-    } else {
-        destination.rating = newRating;
-        destination.rd = playerRecord.newRd;
-        destination.vol = playerRecord.newVol;
+        sessionPlayer.rd = playerRecord.newRd ?? playerRecord.rd;
+        sessionPlayer.vol = playerRecord.newVol ?? playerRecord.vol;
     }
 };
 
-const getOngoingPlayers = (session) => {
+const getOngoingPlayers = (session: SessionDocument): string[] => {
     return session.matches
         .filter((m) => m.status === 'ongoing')
-        .flatMap((m) => [m.player1, m.player2, m.player3, m.player4].filter(Boolean));
+        .flatMap((m) => [m.player1, m.player2, m.player3, m.player4].filter((username): username is string => Boolean(username)));
 };
 
-const getFreeCourts = (session) => {
+const getFreeCourts = (session: SessionDocument): number[] => {
     const busyCourts = session.matches.filter((m) => m.status === 'ongoing').map((m) => m.court);
     return Array.from({ length: session.numCourts }, (_, i) => i + 1).filter((court) => !busyCourts.includes(court));
 };
 
-const buildWaitingMatches = (players, freeCourts, isDoubles) => {
+const buildWaitingMatches = (players: SessionPlayer[], freeCourts: number[], isDoubles: boolean): SessionMatch[] => {
     const neededPlayers = isDoubles ? 4 : 2;
     const sortedPlayers = [...players].sort((a, b) => {
         const joinedA = a.joinedAt ? new Date(a.joinedAt).getTime() : 0;
@@ -150,23 +204,25 @@ const buildWaitingMatches = (players, freeCourts, isDoubles) => {
     let courtIndex = 0;
 
     while (sortedPlayers.length >= neededPlayers && courtIndex < freeCourts.length) {
-        const matchPlayers = [sortedPlayers.shift()];
+        const firstPlayer = sortedPlayers.shift();
+        if (!firstPlayer) break;
+        const matchPlayers = [firstPlayer];
         const remaining = sortedPlayers;
 
         if (isDoubles) {
             if (remaining.length < 3) break;
-            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0], 4);
+            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0]!, 4);
             matchPlayers.push(...remaining.splice(partnerIndex, 1));
             matchPlayers.push(...remaining.splice(0, 2));
         } else {
             if (remaining.length < 1) break;
-            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0], 4);
+            const partnerIndex = selectClosestByRating(remaining, matchPlayers[0]!, 4);
             matchPlayers.push(...remaining.splice(partnerIndex, 1));
         }
 
-        const match = {
-            player1: matchPlayers[0].username,
-            player2: matchPlayers[1].username,
+        const match: SessionMatch = {
+            player1: matchPlayers[0]!.username,
+            player2: matchPlayers[1]!.username,
             court: freeCourts[courtIndex],
             status: 'ongoing',
             startTime: new Date(),
@@ -178,8 +234,8 @@ const buildWaitingMatches = (players, freeCourts, isDoubles) => {
         };
 
         if (isDoubles) {
-            match.player3 = matchPlayers[2].username;
-            match.player4 = matchPlayers[3].username;
+            match.player3 = matchPlayers[2]!.username;
+            match.player4 = matchPlayers[3]!.username;
         }
 
         newMatches.push(match);
@@ -189,10 +245,10 @@ const buildWaitingMatches = (players, freeCourts, isDoubles) => {
     return newMatches;
 };
 
-export const startSession = async (req, res) => {
+export const startSession: RequestHandler<ParamsDictionary, unknown, StartSessionBody> = async (req, res) => {
     try {
         const { title, numCourts, isDoubles, playerNames } = req.body;
-        const nameArray = playerNames.split(',').map((n) => n.trim()).filter(Boolean);
+        const nameArray = playerNames.split(',').map((name) => name.trim()).filter(Boolean);
 
         if (nameArray.length < (isDoubles ? 4 : 2)) {
             return res.status(400).json({ error: `Please enter at least ${isDoubles ? 4 : 2} player names.` });
@@ -200,7 +256,7 @@ export const startSession = async (req, res) => {
 
         await Session.updateMany({ adminId: req.user.id, isActive: true }, { $set: { isActive: false } });
 
-        const playerObjects = await Promise.all(nameArray.map(async (name) => {
+        const playerObjects = await Promise.all(nameArray.map(async (name): Promise<SessionPlayer> => {
             const user = await User.findOne({ username: name });
             return {
                 username: name,
@@ -218,7 +274,7 @@ export const startSession = async (req, res) => {
             title,
             numCourts,
             isDoubles,
-            adminId: req.user.id,
+            adminId: new mongoose.Types.ObjectId(req.user.id),
             players: playerObjects,
             matches,
             isActive: matches.length > 0
@@ -228,11 +284,11 @@ export const startSession = async (req, res) => {
         res.status(201).json(newSession);
     } catch (err) {
         console.error('START SESSION ERROR:', err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: getErrorMessage(err) });
     }
 };
 
-export const endMatch = async (req, res) => {
+export const endMatch: RequestHandler<ParamsDictionary, unknown, EndMatchBody> = async (req, res) => {
     try {
         const { sessionId, matchId, winnerName, winnerTeam, score } = req.body;
         const session = await Session.findById(sessionId);
@@ -258,19 +314,28 @@ export const endMatch = async (req, res) => {
             return res.status(400).json({ error: 'Cannot finish a match with a vacant player spot. Fill all required slots before ending the match.' });
         }
 
-        const winnerNames = match.player3 && match.player4
-            ? (winnerTeam === 'team2' ? [match.player3, match.player4] : [match.player1, match.player2])
-            : [winnerName];
-        const loserNames = match.player3 && match.player4
-            ? (winnerTeam === 'team2' ? [match.player1, match.player2] : [match.player3, match.player4])
-            : (winnerName === match.player1 ? [match.player2] : [match.player1]);
+        const teamOnePlayers = [match.player1, match.player2].filter((player): player is string => Boolean(player));
+        const teamTwoPlayers = [match.player3, match.player4].filter((player): player is string => Boolean(player));
+        const isDoublesMatch = teamTwoPlayers.length === 2;
+        if (isDoublesMatch && !winnerTeam) {
+            return res.status(400).json({ error: 'Select the winning team' });
+        }
+        if (!isDoublesMatch && (!winnerName || !teamOnePlayers.includes(winnerName))) {
+            return res.status(400).json({ error: 'Select a valid winning player' });
+        }
 
-        const winnerPlayers = await Promise.all(winnerNames.map(async (username) => {
+        const winnerNames = isDoublesMatch
+            ? (winnerTeam === 'team2' ? teamTwoPlayers : teamOnePlayers)
+            : [winnerName!];
+        const loserNames = isDoublesMatch
+            ? (winnerTeam === 'team2' ? teamOnePlayers : teamTwoPlayers)
+            : (winnerName === match.player1 ? [match.player2!] : [match.player1!]);
+
+        const winnerPlayers = await Promise.all(winnerNames.map(async (username): Promise<RatingPlayer> => {
             const user = await User.findOne({ username });
             const sessionPlayer = findSessionPlayer(session, username);
             return {
                 username,
-                isGuest: !user,
                 user,
                 session,
                 rating: user ? user.rating : sessionPlayer?.rating ?? 1500,
@@ -280,12 +345,11 @@ export const endMatch = async (req, res) => {
             };
         }));
 
-        const loserPlayers = await Promise.all(loserNames.map(async (username) => {
+        const loserPlayers = await Promise.all(loserNames.map(async (username): Promise<RatingPlayer> => {
             const user = await User.findOne({ username });
             const sessionPlayer = findSessionPlayer(session, username);
             return {
                 username,
-                isGuest: !user,
                 user,
                 session,
                 rating: user ? user.rating : sessionPlayer?.rating ?? 1500,
@@ -308,12 +372,12 @@ export const endMatch = async (req, res) => {
         for (const winner of winnerPlayers) {
             winner.newRd = winnerGlicko.getRd();
             winner.newVol = winnerGlicko.getVol();
-            await applyRatingDelta(winner, winnerDelta, loserNames, match);
+            await applyRatingDelta(winner, winnerDelta, loserNames);
         }
         for (const loser of loserPlayers) {
             loser.newRd = loserGlicko.getRd();
             loser.newVol = loserGlicko.getVol();
-            await applyRatingDelta(loser, loserDelta, winnerNames, match);
+            await applyRatingDelta(loser, loserDelta, winnerNames);
         }
 
         match.status = 'finished';
@@ -323,7 +387,7 @@ export const endMatch = async (req, res) => {
             match.score = { ...match.score, ...score };
         }
 
-        const finishedPlayers = [match.player1, match.player2, match.player3, match.player4].filter(Boolean);
+        const finishedPlayers = [match.player1, match.player2, match.player3, match.player4].filter((player): player is string => Boolean(player));
         session.players.forEach((player) => {
             if (finishedPlayers.includes(player.username)) {
                 player.joinedAt = new Date();
@@ -350,11 +414,11 @@ export const endMatch = async (req, res) => {
         res.json({ message: 'Match ended', session });
     } catch (err) {
         console.error('END MATCH ERROR:', err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: getErrorMessage(err) });
     }
 };
 
-export const addPlayerToSession = async (req, res) => {
+export const addPlayerToSession: RequestHandler<ParamsDictionary, unknown, SessionPlayerBody> = async (req, res) => {
     try {
         const { sessionId, username } = req.body;
         if (!username) {
@@ -391,11 +455,11 @@ export const addPlayerToSession = async (req, res) => {
         res.json({ message: 'Player added', session });
     } catch (err) {
         console.error('ADD PLAYER ERROR:', err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: getErrorMessage(err) });
     }
 };
 
-export const removePlayerFromSession = async (req, res) => {
+export const removePlayerFromSession: RequestHandler<ParamsDictionary, unknown, SessionPlayerBody> = async (req, res) => {
     try {
         const { sessionId, username } = req.body;
         if (!username) {
@@ -416,7 +480,7 @@ export const removePlayerFromSession = async (req, res) => {
         }
 
         session.matches.forEach((match) => {
-            ['player1', 'player2', 'player3', 'player4'].forEach((field) => {
+            (['player1', 'player2', 'player3', 'player4'] as PlayerField[]).forEach((field) => {
                 if (match[field] === username) {
                     match[field] = undefined;
                 }
@@ -439,18 +503,18 @@ export const removePlayerFromSession = async (req, res) => {
         res.json({ message: 'Player removed', session });
     } catch (err) {
         console.error('REMOVE PLAYER ERROR:', err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: getErrorMessage(err) });
     }
 };
 
-export const replaceMatchPlayer = async (req, res) => {
+export const replaceMatchPlayer: RequestHandler<ParamsDictionary, unknown, ReplacePlayerBody> = async (req, res) => {
     try {
         const { sessionId, matchId, field, replacementUsername } = req.body;
         if (!field || !replacementUsername) {
             return res.status(400).json({ error: 'Both field and replacementUsername are required' });
         }
 
-        const allowedFields = ['player1', 'player2', 'player3', 'player4'];
+        const allowedFields: PlayerField[] = ['player1', 'player2', 'player3', 'player4'];
         if (!allowedFields.includes(field)) {
             return res.status(400).json({ error: 'Invalid match field' });
         }
@@ -506,11 +570,11 @@ export const replaceMatchPlayer = async (req, res) => {
         res.json({ message: 'Player replaced', session });
     } catch (err) {
         console.error('REPLACE PLAYER ERROR:', err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: getErrorMessage(err) });
     }
 };
 
-export const endSession = async (req, res) => {
+export const endSession: RequestHandler<ParamsDictionary, unknown, EndSessionBody> = async (req, res) => {
     try {
         const { sessionId } = req.body;
         const session = await Session.findById(sessionId);
@@ -530,6 +594,6 @@ export const endSession = async (req, res) => {
         res.json({ message: 'Session closed', session });
     } catch (err) {
         console.error('END SESSION ERROR:', err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: getErrorMessage(err) });
     }
 };
