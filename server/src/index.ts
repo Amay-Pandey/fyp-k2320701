@@ -49,6 +49,9 @@ const mongoUri = process.env.MONGO_DB_URI;
 if (!mongoUri) {
     throw new Error('MONGO_DB_URI is not configured');
 }
+if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+}
 
 mongoose.connect(mongoUri)
     .then(() => console.log('✅ MongoDB Connected'))

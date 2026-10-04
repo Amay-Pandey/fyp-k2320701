@@ -24,6 +24,9 @@ interface AuthResponse {
 }
 
 const router = express.Router();
+const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : 'Unknown error';
+const isDuplicateUsername = (error: unknown): boolean =>
+    typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
 
 // Register
 const register: RequestHandler<Record<string, never>, AuthResponse, RegisterRequest> = async (req, res) => {
@@ -54,8 +57,13 @@ const register: RequestHandler<Record<string, never>, AuthResponse, RegisterRequ
         });
         await user.save();
         res.status(201).json({ message: "User Created" });
-    } catch (e) {
-        res.status(400).json({ error: "Username already exists" });
+    } catch (error) {
+        console.error('REGISTER ERROR:', getErrorMessage(error));
+        if (isDuplicateUsername(error)) {
+            res.status(409).json({ error: 'Username already exists' });
+            return;
+        }
+        res.status(500).json({ error: 'Could not create account' });
     }
 };
 
@@ -77,7 +85,8 @@ const login: RequestHandler<Record<string, never>, AuthResponse, LoginRequest> =
         } else {
             res.status(401).json({ error: "Invalid credentials" });
         }
-    } catch (e) {
+    } catch (error) {
+        console.error('LOGIN ERROR:', getErrorMessage(error));
         res.status(500).json({ error: "Server error" });
     }
 };
