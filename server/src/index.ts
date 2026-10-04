@@ -26,7 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', apiRoutes);
 app.use('/api/session', apiRoutes);
 
-const buildPath = path.resolve(__dirname, '../client/dist');
+const buildPath = path.resolve(__dirname, '../../client/dist');
 app.use(express.static(buildPath));
 
 app.use((req, res, next) => {

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: courtsync
+    runtime: node
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_DB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
